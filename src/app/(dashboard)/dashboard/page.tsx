@@ -3,11 +3,10 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChatInput } from "@/components/chat-input";
 
 export default function DashboardPage() {
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -16,16 +15,11 @@ export default function DashboardPage() {
     }
   }, [user, loading, router]);
 
-  const handleSignOut = async () => {
-    await signOut();
-    router.push("/");
-  };
-
   if (loading) {
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p>Loading...</p>
-      </main>
+      <div className="flex flex-1 items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
     );
   }
 
@@ -34,25 +28,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <Button variant="outline" onClick={handleSignOut}>
-            Sign Out
-          </Button>
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Welcome back!</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground">
-              Logged in as: {user.email}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+    <div className="flex flex-1 flex-col items-center justify-center p-8">
+      <ChatInput
+        onSendMessage={(message) => {
+          console.log("Send message:", message);
+        }}
+      />
+    </div>
   );
 }
