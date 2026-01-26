@@ -3,17 +3,7 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Plus,
-  Clock,
-  ChevronDown,
-  ArrowUp,
-  Pencil,
-  Sparkles,
-  Code,
-  Briefcase,
-  Lightbulb,
-} from "lucide-react";
+import { Plus, Clock, ChevronDown, ArrowUp } from "lucide-react";
 
 interface ChatInputProps {
   onSendMessage?: (message: string) => void;
@@ -36,14 +26,6 @@ export function ChatInput({ onSendMessage }: ChatInputProps) {
       handleSubmit();
     }
   };
-
-  const quickActions = [
-    { icon: Pencil, label: "Write" },
-    { icon: Sparkles, label: "Learn" },
-    { icon: Code, label: "Code" },
-    { icon: Briefcase, label: "Life stuff" },
-    { icon: Lightbulb, label: "Claude's choice" },
-  ];
 
   // Get greeting based on time of day
   const getGreeting = () => {
@@ -121,21 +103,6 @@ export function ChatInput({ onSendMessage }: ChatInputProps) {
             </Button>
           </div>
         </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="flex flex-wrap justify-center gap-2">
-        {quickActions.map((action) => (
-          <Button
-            key={action.label}
-            variant="outline"
-            size="sm"
-            className="gap-2 rounded-full border-border bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <action.icon className="size-4" />
-            {action.label}
-          </Button>
-        ))}
       </div>
     </div>
   );
