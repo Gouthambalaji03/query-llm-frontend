@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useChatStore } from "@/hooks/use-chat-store";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ChatInput } from "@/components/chat-input";
@@ -8,6 +9,7 @@ import { ChatInput } from "@/components/chat-input";
 export default function NewChatPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const createChat = useChatStore((state) => state.createChat);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -16,8 +18,9 @@ export default function NewChatPage() {
   }, [user, loading, router]);
 
   const handleSendMessage = (message: string) => {
-    // TODO: Create new chat and redirect to chat/[id]
-    console.log("New message:", message);
+    // Create new chat with UUID and navigate to it
+    const chatId = createChat(message);
+    router.push(`/queries/chat/${chatId}`);
   };
 
   if (loading) {

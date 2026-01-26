@@ -1,44 +1,18 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useChatStore } from "@/hooks/use-chat-store";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageSquare, Clock, Trash2 } from "lucide-react";
 
-interface ChatHistory {
-  id: string;
-  title: string;
-  lastMessage: string;
-  createdAt: Date;
-}
-
 export default function HistoryPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-
-  // Mock data - replace with actual API call
-  const [chats, setChats] = useState<ChatHistory[]>([
-    {
-      id: "1",
-      title: "Database query optimization",
-      lastMessage: "How can I optimize this SQL query?",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60),
-    },
-    {
-      id: "2",
-      title: "User analytics report",
-      lastMessage: "Show me the user growth for last month",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
-    },
-    {
-      id: "3",
-      title: "Sales data analysis",
-      lastMessage: "What were the top selling products?",
-      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3),
-    },
-  ]);
+  const chats = useChatStore((state) => state.chats);
+  const deleteChat = useChatStore((state) => state.deleteChat);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -48,7 +22,8 @@ export default function HistoryPage() {
 
   const formatDate = (date: Date) => {
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
+    const chatDate = new Date(date);
+    const diff = now.getTime() - chatDate.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
 
@@ -58,9 +33,9 @@ export default function HistoryPage() {
     return `${days} days ago`;
   };
 
-  const handleDeleteChat = (id: string) => {
-    setChats((prev) => prev.filter((chat) => chat.id !== id));
-    // TODO: Call API to delete chat
+  const handleDeleteChat = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteChat(id);
   };
 
   if (loading) {
@@ -107,16 +82,16 @@ export default function HistoryPage() {
                 onClick={() => router.push(`/queries/chat/${chat.id}`)}
               >
                 <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-start gap-3">
-                    <MessageSquare className="mt-0.5 size-5 text-muted-foreground" />
-                    <div>
-                      <h3 className="font-medium">{chat.title}</h3>
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {chat.lastMessage}
+                  <div className="flex items-start gap-3 overflow-hidden">
+                    <MessageSquare className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+                    <div className="min-w-0">
+                      <h3 className="truncate font-medium">{chat.title}</h3>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {chat.messages.length} message{chat.messages.length !== 1 ? "s" : ""}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex shrink-0 items-center gap-3">
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Clock className="size-3" />
                       {formatDate(chat.createdAt)}
@@ -124,10 +99,7 @@ export default function HistoryPage() {
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteChat(chat.id);
-                      }}
+                      onClick={(e) => handleDeleteChat(chat.id, e)}
                       className="text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 className="size-4" />

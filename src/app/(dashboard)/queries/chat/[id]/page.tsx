@@ -1,17 +1,12 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useChatStore } from "@/hooks/use-chat-store";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ChatInput } from "@/components/chat-input";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-}
 
 export default function ChatPage() {
   const { user, loading } = useAuth();
@@ -19,7 +14,8 @@ export default function ChatPage() {
   const params = useParams();
   const chatId = params.id as string;
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const chat = useChatStore((state) => state.getChat(chatId));
+  const addMessage = useChatStore((state) => state.addMessage);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -28,18 +24,15 @@ export default function ChatPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    // TODO: Fetch chat messages by ID
-    console.log("Load chat:", chatId);
-  }, [chatId]);
+    // Redirect if chat doesn't exist
+    if (!loading && user && !chat) {
+      router.push("/queries/chat/new");
+    }
+  }, [chat, loading, user, router]);
 
   const handleSendMessage = (message: string) => {
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: message,
-    };
-    setMessages((prev) => [...prev, newMessage]);
-    // TODO: Send message to API and get response
+    addMessage(chatId, "user", message);
+    // TODO: Send to API and get assistant response
   };
 
   if (loading) {
@@ -50,7 +43,7 @@ export default function ChatPage() {
     );
   }
 
-  if (!user) {
+  if (!user || !chat) {
     return null;
   }
 
@@ -65,41 +58,35 @@ export default function ChatPage() {
         >
           <ArrowLeft className="size-5" />
         </Button>
-        <h1 className="text-lg font-medium">Chat #{chatId}</h1>
+        <h1 className="truncate text-lg font-medium">{chat.title}</h1>
       </header>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4">
-        {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-muted-foreground">No messages yet</p>
-          </div>
-        ) : (
-          <div className="mx-auto max-w-3xl space-y-4">
-            {messages.map((msg) => (
+        <div className="mx-auto max-w-3xl space-y-4">
+          {chat.messages.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
               <div
-                key={msg.id}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                  msg.role === "user"
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground"
+                }`}
               >
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2 ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-foreground"
-                  }`}
-                >
-                  {msg.content}
-                </div>
+                {msg.content}
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Input */}
       <div className="border-t border-border p-4">
         <div className="mx-auto max-w-3xl">
-          <ChatInput onSendMessage={handleSendMessage} />
+          <ChatInput onSendMessage={handleSendMessage} showGreeting={false} />
         </div>
       </div>
     </div>
