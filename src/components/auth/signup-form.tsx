@@ -55,7 +55,7 @@ export function SignupForm() {
     try {
       await signUp(data.email, data.password);
       toast.success("Account created successfully");
-      router.push("/dashboard");
+      router.push("/queries/chat/new");
     } catch {
       toast.error("Failed to create account. Email may already be in use.");
     }

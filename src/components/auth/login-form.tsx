@@ -48,7 +48,7 @@ export function LoginForm() {
     try {
       await signIn(data.email, data.password);
       toast.success("Logged in successfully");
-      router.push("/dashboard");
+      router.push("/queries/chat/new");
     } catch {
       toast.error("Invalid email or password");
     }

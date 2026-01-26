@@ -1,19 +1,27 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
+import { useChatStore } from "@/hooks/use-chat-store";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ChatInput } from "@/components/chat-input";
 
-export default function DashboardPage() {
+export default function NewChatPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const createChat = useChatStore((state) => state.createChat);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
     }
   }, [user, loading, router]);
+
+  const handleSendMessage = (message: string) => {
+    // Create new chat with UUID and navigate to it
+    const chatId = createChat(message);
+    router.push(`/queries/chat/${chatId}`);
+  };
 
   if (loading) {
     return (
@@ -29,11 +37,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-8">
-      <ChatInput
-        onSendMessage={(message) => {
-          console.log("Send message:", message);
-        }}
-      />
+      <ChatInput onSendMessage={handleSendMessage} />
     </div>
   );
 }
