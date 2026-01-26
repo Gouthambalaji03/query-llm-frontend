@@ -14,6 +14,7 @@ import {
   Search,
   Calendar,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function HistoryPage() {
   const { user, loading } = useAuth();
@@ -77,6 +78,7 @@ export default function HistoryPage() {
   const handleDeleteChat = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     deleteChat(id);
+    toast.success("Conversation deleted");
   };
 
   if (loading) {

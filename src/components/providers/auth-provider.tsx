@@ -9,12 +9,14 @@ import {
 } from "firebase/auth";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { AuthContextType, User } from "@/types";
+import { useCreateUser } from "@/hooks/api";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const createUserMutation = useCreateUser();
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -33,7 +35,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string) => {
     const auth = getFirebaseAuth();
-    await createUserWithEmailAndPassword(auth, email, password);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    
+    await createUserMutation.mutateAsync({
+      name: email.split("@")[0],
+      email: email,
+    });
+    
+    return userCredential;
   };
 
   const signOut = async () => {

@@ -1,0 +1,483 @@
+# Query LLM Frontend - Cursor Rules
+
+## Project Overview
+This is a Next.js 16 React application with TypeScript, TanStack Query (React Query), Firebase Auth, and Tailwind CSS.
+
+## Tech Stack
+- Framework: Next.js 16 (App Router)
+- Runtime: React 19
+- Language: TypeScript
+- State Management: Zustand + TanStack Query
+- Authentication: Firebase Client SDK
+- Styling: Tailwind CSS + shadcn/ui
+- Forms: React Hook Form + Zod
+- HTTP Client: Axios
+- UI Components: Radix UI + Custom Components
+- Package Manager: npm
+
+## Naming Conventions
+
+### Files
+- React Components: PascalCase - `LoginForm.tsx`, `ChatInput.tsx`, `Sidebar.tsx`
+- Pages (App Router): lowercase - `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`
+- Hooks: kebab-case with `use-` prefix - `use-auth.ts`, `use-chat-store.ts`, `use-conversation-queries.ts`
+- Utils/Libs: kebab-case - `api.ts`, `utils.ts`, `firebase.ts`, `tanstack-query.ts`
+- Types: kebab-case - `index.ts`, `tanstack-query.ts`
+
+### Code
+- Variables: camelCase - `userData`, `isValid`, `authToken`
+- Functions: camelCase - `getUserById()`, `createUser()`, `validateInput()`
+- Constants: SCREAMING_SNAKE_CASE - `MAX_PAGE_SIZE`, `DEFAULT_LIMIT`
+- Types/Interfaces: PascalCase with `T` prefix - `TUser`, `TConversation`, `TApiResponse`
+- Type Props: PascalCase - `LoginFormProps`, `SidebarProps`
+- Route Groups: (parentheses) - `(auth)`, `(private)`
+
+## Project Structure
+```
+src/
+├── app/                      # Next.js App Router
+│   ├── (auth)/               # Auth route group (no layout)
+│   │   ├── login/
+│   │   │   └── page.tsx
+│   │   └── signup/
+│   │       └── page.tsx
+│   ├── (private)/            # Protected routes
+│   │   ├── layout.tsx        # Private layout with auth check
+│   │   └── queries/
+│   │       ├── chat/
+│   │       │   ├── [id]/
+│   │       │   │   └── page.tsx
+│   │       │   └── new/
+│   │       │       └── page.tsx
+│   │       └── history/
+│   │           └── page.tsx
+│   ├── layout.tsx            # Root layout
+│   ├── page.tsx              # Landing page
+│   └── globals.css           # Global styles
+├── components/
+│   ├── auth/                 # Auth-specific components
+│   ├── providers/            # Context providers
+│   │   ├── auth-provider.tsx
+│   │   └── query-provider.tsx
+│   └── ui/                   # shadcn/ui components
+├── hooks/
+│   ├── api/                  # React Query hooks
+│   │   ├── auth.ts
+│   │   ├── user.ts
+│   │   ├── conversation.ts
+│   │   └── index.ts
+│   └── custom/               # Custom hooks (non-API)
+│       ├── use-auth.ts
+│       └── use-chat-store.ts
+├── lib/                      # Utility functions
+│   ├── api.ts                # Axios instance
+│   ├── firebase.ts           # Firebase config
+│   ├── tanstack-query.ts     # QueryClient config
+│   └── utils.ts              # Helper functions
+└── types/                    # TypeScript types
+    ├── index.ts              # Main types
+    └── tanstack-query.ts     # React Query types
+```
+
+## Code Patterns
+
+### Page Component Pattern (App Router)
+```typescript
+"use client";
+
+import { useAuth } from "@/hooks/custom/use-auth";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+export default function ProtectedPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [user, loading, router]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return <div>Protected Content</div>;
+}
+```
+
+### React Query Hook Pattern
+```typescript
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { queryClient } from "@/lib/tanstack-query";
+import type { TEntity, TCreateEntityInput } from "@/types";
+import type { TApiPromise, TMutationOpts, TQueryOpts } from "@/types/tanstack-query";
+
+export type TGetEntityArgs = {
+  entityId: string;
+};
+
+export type TGetEntityResult = TEntity;
+
+export const useGetEntity = (
+  args: TGetEntityArgs,
+  options?: TQueryOpts<TGetEntityResult>
+) => {
+  return useQuery({
+    queryKey: ["useGetEntity", args],
+    queryFn: () => {
+      return api.get(`/entities/${args.entityId}`) as TApiPromise<TGetEntityResult>;
+    },
+    enabled: !!args.entityId,
+    ...options,
+  });
+};
+
+export type TCreateEntityArgs = TCreateEntityInput;
+
+export type TCreateEntityResult = TEntity;
+
+export const useCreateEntity = (
+  options?: TMutationOpts<TCreateEntityArgs, TCreateEntityResult>
+) => {
+  return useMutation({
+    mutationKey: ["useCreateEntity"],
+    mutationFn: (args: TCreateEntityArgs) => {
+      return api.post("/entities/", args) as TApiPromise<TCreateEntityResult>;
+    },
+    ...options,
+    onSuccess: (...data) => {
+      queryClient.invalidateQueries({ queryKey: ["useGetEntity"] });
+      options?.onSuccess?.(...data);
+    },
+  });
+};
+```
+
+### Component Pattern
+```typescript
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+interface ComponentNameProps {
+  title: string;
+  onAction?: () => void;
+}
+
+export function ComponentName({ title, onAction }: ComponentNameProps) {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleClick = async () => {
+    setIsLoading(true);
+    try {
+      await onAction?.();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <h1>{title}</h1>
+      <Button onClick={handleClick} disabled={isLoading}>
+        {isLoading ? "Loading..." : "Click Me"}
+      </Button>
+    </div>
+  );
+}
+```
+
+### Form Pattern with React Hook Form
+```typescript
+"use client";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+
+const formSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type FormValues = z.infer<typeof formSchema>;
+
+export function MyForm() {
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  const onSubmit = async (data: FormValues) => {
+    try {
+      toast.success("Success!");
+    } catch {
+      toast.error("Failed!");
+    }
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email</FormLabel>
+              <FormControl>
+                <Input placeholder="email@example.com" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          Submit
+        </Button>
+      </form>
+    </Form>
+  );
+}
+```
+
+### Zustand Store Pattern
+```typescript
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+
+interface StoreState {
+  items: Item[];
+  addItem: (item: Item) => void;
+  removeItem: (id: string) => void;
+  getItem: (id: string) => Item | undefined;
+}
+
+export const useStore = create<StoreState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      addItem: (item) => set((state) => ({ items: [...state.items, item] })),
+      removeItem: (id) => set((state) => ({
+        items: state.items.filter((item) => item.id !== id)
+      })),
+      getItem: (id) => get().items.find((item) => item.id === id),
+    }),
+    {
+      name: "store-storage",
+    }
+  )
+);
+```
+
+## Best Practices
+
+### Do
+- Always use `"use client"` directive for interactive components
+- Use TypeScript path aliases: `@/components/`, `@/hooks/`, `@/lib/`
+- Wrap API data fetching in React Query hooks
+- Use shadcn/ui components for consistency
+- Handle loading and error states in UI
+- Use `toast` from sonner for notifications
+- Validate forms with Zod schemas
+- Use TypeScript for all files (no `.js` or `.jsx`)
+- Export components with named exports when multiple, default for pages
+- Invalidate React Query caches after mutations
+- Use `useRouter` from `next/navigation` (not `next/router`)
+- Use Firebase for authentication only (backend manages user data)
+- Access backend API through React Query hooks
+- Use proper TypeScript types from `@/types`
+
+### Don't
+- Don't use `"use server"` unless necessary for Server Actions
+- Don't fetch data directly in components (use React Query)
+- Don't store auth tokens manually (Firebase SDK handles it)
+- Don't use `getServerSideProps` or `getStaticProps` (use App Router patterns)
+- Don't import from `next/router` (use `next/navigation`)
+- Don't use inline styles (use Tailwind classes)
+- Don't create custom HTTP request functions (use React Query hooks)
+- Don't bypass form validation
+- Don't ignore loading/error states
+- Don't use `any` type
+
+## Authentication Pattern
+
+Firebase handles auth, backend manages user data:
+
+```typescript
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const createUserMutation = useCreateUser();
+
+  useEffect(() => {
+    const auth = getFirebaseAuth();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const signUp = async (email: string, password: string) => {
+    const auth = getFirebaseAuth();
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    
+    await createUserMutation.mutateAsync({
+      name: email.split("@")[0],
+      email: email,
+    });
+    
+    return userCredential;
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, signIn, signUp, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+```
+
+## API Integration
+
+All backend calls go through React Query hooks:
+
+```typescript
+import { useCreateConversation } from "@/hooks/api";
+import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
+
+const createMutation = useCreateConversation({
+  onSuccess: (response) => {
+    console.log("Created:", response.data);
+    toast.success("Conversation created");
+  },
+  onError: (error) => {
+    console.error("Failed:", error);
+    toast.error("Failed to create conversation");
+  },
+});
+
+createMutation.mutate({
+  conversation_id: uuidv4(),
+  title: "New Chat",
+  model: "gpt-4",
+});
+```
+
+## Type Definitions
+
+Always define types with `T` prefix:
+
+```typescript
+export interface TUser {
+  id: string;
+  firebase_uid: string;
+  name: string;
+  email: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface TApiSuccessResponse<T> {
+  success: true;
+  data: T;
+  message?: string;
+}
+
+export interface TApiErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+export type TApiResponse<T> = TApiSuccessResponse<T> | TApiErrorResponse;
+```
+
+## Styling Guidelines
+
+Use Tailwind utility classes:
+
+```typescript
+<div className="flex items-center justify-between gap-4 p-4">
+  <h1 className="text-2xl font-semibold">Title</h1>
+  <Button variant="ghost" size="sm">Action</Button>
+</div>
+```
+
+Use `cn()` utility for conditional classes:
+
+```typescript
+import { cn } from "@/lib/utils";
+
+<div className={cn(
+  "base-classes",
+  isActive && "active-classes",
+  isDisabled && "disabled-classes"
+)} />
+```
+
+## Environment Variables
+
+Always prefix with `NEXT_PUBLIC_` for client-side access:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_FIREBASE_API_KEY=...
+```
+
+## Adding New Features
+
+1. Define types in `src/types/index.ts`
+2. Create React Query hooks in `src/hooks/api/{entity}.ts`
+3. Create UI components in `src/components/`
+4. Create pages in `src/app/` following App Router structure
+5. Add routes to sidebar/navigation
+
+## Key Differences from Backend
+
+| Backend | Frontend |
+|---------|----------|
+| snake_case | camelCase/PascalCase |
+| One function per file | Multiple exports per file |
+| Express routes | Next.js App Router |
+| Mongoose models | TypeScript interfaces |
+| Direct DB access | API calls via React Query |
+| Zod in controllers | Zod in forms |
+
+## Common Gotchas
+
+1. **Always use `"use client"`** for components with hooks/interactivity
+2. **Router from `next/navigation`** not `next/router`
+3. **Firebase token auto-refresh** is handled by Firebase SDK
+4. **React Query invalidation** must happen in `onSuccess` callbacks
+5. **Loading states** are critical for good UX
+6. **Toast notifications** provide feedback for all mutations
+7. **Type safety** - always use proper TypeScript types
+8. **Path aliases** - always use `@/` not relative imports
