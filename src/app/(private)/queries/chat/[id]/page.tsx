@@ -1,7 +1,7 @@
 "use client";
 
-import { useAuth } from "@/hooks/use-auth";
-import { useChatStore } from "@/hooks/use-chat-store";
+import { useAuth } from "@/hooks/custom/use-auth";
+import { useChatStore } from "@/hooks/custom/use-chat-store";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect } from "react";
 import { ChatInput } from "@/components/chat-input";
@@ -24,7 +24,6 @@ export default function ChatPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    // Redirect if chat doesn't exist
     if (!loading && user && !chat) {
       router.push("/queries/chat/new");
     }
@@ -32,7 +31,6 @@ export default function ChatPage() {
 
   const handleSendMessage = (message: string) => {
     addMessage(chatId, "user", message);
-    // TODO: Send to API and get assistant response
   };
 
   if (loading) {

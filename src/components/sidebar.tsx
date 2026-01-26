@@ -6,8 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/hooks/use-auth";
-import { useChatStore } from "@/hooks/use-chat-store";
+import { useAuth } from "@/hooks/custom/use-auth";
+import { useChatStore } from "@/hooks/custom/use-chat-store";
 import {
   Plus,
   Search,

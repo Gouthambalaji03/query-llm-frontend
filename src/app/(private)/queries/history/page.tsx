@@ -1,12 +1,13 @@
 "use client";
 
-import { useAuth } from "@/hooks/use-auth";
-import { useChatStore } from "@/hooks/use-chat-store";
+import { useAuth } from "@/hooks/custom/use-auth";
+import { useChatStore } from "@/hooks/custom/use-chat-store";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageSquare, Clock, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function HistoryPage() {
   const { user, loading } = useAuth();
@@ -36,6 +37,7 @@ export default function HistoryPage() {
   const handleDeleteChat = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     deleteChat(id);
+    toast.success("Conversation deleted");
   };
 
   if (loading) {

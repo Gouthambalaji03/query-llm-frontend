@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ChatInput } from "@/components/chat-input";
 
-export default function NewChatPage() {
+export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const createChat = useChatStore((state) => state.createChat);
@@ -18,7 +18,6 @@ export default function NewChatPage() {
   }, [user, loading, router]);
 
   const handleSendMessage = (message: string) => {
-    // Create new chat with UUID and navigate to it
     const chatId = createChat(message);
     router.push(`/queries/chat/${chatId}`);
   };
