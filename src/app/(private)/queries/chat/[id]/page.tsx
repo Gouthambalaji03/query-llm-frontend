@@ -1,7 +1,7 @@
 "use client";
 
-import { useAuth } from "@/hooks/use-auth";
-import { useChatStore, Message } from "@/hooks/use-chat-store";
+import { useAuth } from "@/hooks/custom/use-auth";
+import { useChatStore, Message } from "@/hooks/custom/use-chat-store";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";

@@ -1,4 +1,4 @@
-import { Chat } from "@/hooks/use-chat-store";
+import { Chat } from "@/hooks/custom/use-chat-store";
 import { v4 as uuidv4 } from "uuid";
 
 const now = new Date();
