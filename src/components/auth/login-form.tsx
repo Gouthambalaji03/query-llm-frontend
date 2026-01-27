@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth } from "@/hooks/custom/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {

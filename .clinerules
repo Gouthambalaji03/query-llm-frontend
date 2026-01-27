@@ -1,0 +1,343 @@
+# Query LLM Frontend - Claude Rules
+
+## Project Context
+This is a Next.js 16 React application with TypeScript, using App Router, TanStack Query, Firebase Auth, and Tailwind CSS.
+
+## Critical Conventions
+
+### Naming Rules
+- **Components**: PascalCase - `LoginForm`, `ChatInput`, `Sidebar`
+- **Pages**: lowercase - `page.tsx`, `layout.tsx`
+- **Hooks**: kebab-case + `use-` - `use-auth.ts`, `use-conversation-queries.ts`
+- **Variables**: camelCase - `userData`, `isLoading`, `conversationId`
+- **Functions**: camelCase - `handleSubmit()`, `fetchData()`, `validateInput()`
+- **Types**: PascalCase + `T` prefix - `TUser`, `TConversation`, `TApiResponse`
+- **Constants**: SCREAMING_SNAKE_CASE - `API_BASE_URL`, `MAX_RETRIES`
+
+### Architecture Layers
+
+| Layer | Purpose | Location |
+|-------|---------|----------|
+| Pages | Route handlers | `src/app/` |
+| Components | Reusable UI | `src/components/` |
+| Hooks (API) | Backend integration | `src/hooks/api/` |
+| Hooks (Custom) | Local state/logic | `src/hooks/custom/` |
+| Providers | Context/global state | `src/components/providers/` |
+| Types | TypeScript definitions | `src/types/` |
+| Lib | Utilities/config | `src/lib/` |
+
+## Standard Patterns
+
+### New API Hook Template
+```typescript
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { queryClient } from "@/lib/tanstack-query";
+import type { TEntity } from "@/types";
+import type { TApiPromise, TMutationOpts, TQueryOpts } from "@/types/tanstack-query";
+
+export type TGetEntityArgs = { entityId: string };
+export type TGetEntityResult = TEntity;
+
+export const useGetEntity = (
+  args: TGetEntityArgs,
+  options?: TQueryOpts<TGetEntityResult>
+) => {
+  return useQuery({
+    queryKey: ["useGetEntity", args],
+    queryFn: () => api.get(`/entities/${args.entityId}`) as TApiPromise<TGetEntityResult>,
+    enabled: !!args.entityId,
+    ...options,
+  });
+};
+
+export type TCreateEntityArgs = { name: string };
+export type TCreateEntityResult = TEntity;
+
+export const useCreateEntity = (
+  options?: TMutationOpts<TCreateEntityArgs, TCreateEntityResult>
+) => {
+  return useMutation({
+    mutationKey: ["useCreateEntity"],
+    mutationFn: (args) => api.post("/entities/", args) as TApiPromise<TCreateEntityResult>,
+    ...options,
+    onSuccess: (...data) => {
+      queryClient.invalidateQueries({ queryKey: ["useGetEntity"] });
+      options?.onSuccess?.(...data);
+    },
+  });
+};
+```
+
+### New Page Template
+```typescript
+"use client";
+
+import { useAuth } from "@/hooks/custom/use-auth";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+
+export default function PageName() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [user, loading, router]);
+
+  if (loading) return <div>Loading...</div>;
+  if (!user) return null;
+
+  return <div>Content</div>;
+}
+```
+
+### New Component Template
+```typescript
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+interface ComponentProps {
+  title: string;
+  onAction?: () => void;
+}
+
+export function Component({ title, onAction }: ComponentProps) {
+  const [isActive, setIsActive] = useState(false);
+
+  return (
+    <div>
+      <h2>{title}</h2>
+      <Button onClick={onAction}>Action</Button>
+    </div>
+  );
+}
+```
+
+### Form Component Template
+```typescript
+"use client";
+
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { toast } from "sonner";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+
+const schema = z.object({
+  field: z.string().min(1, "Required"),
+});
+
+type FormData = z.infer<typeof schema>;
+
+export function MyForm() {
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { field: "" },
+  });
+
+  const onSubmit = async (data: FormData) => {
+    try {
+      toast.success("Success!");
+    } catch {
+      toast.error("Error!");
+    }
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FormField
+          control={form.control}
+          name="field"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Field</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          Submit
+        </Button>
+      </form>
+    </Form>
+  );
+}
+```
+
+## React Query Patterns
+
+### Query Hook Checklist
+- [ ] Export type for args: `TGetEntityArgs`
+- [ ] Export type for result: `TGetEntityResult`
+- [ ] Use descriptive queryKey: `["useGetEntity", args]`
+- [ ] Cast return type: `as TApiPromise<TGetEntityResult>`
+- [ ] Add `enabled` condition if needed
+- [ ] Spread `options` parameter
+
+### Mutation Hook Checklist
+- [ ] Export type for args: `TCreateEntityArgs`
+- [ ] Export type for result: `TCreateEntityResult`
+- [ ] Use descriptive mutationKey: `["useCreateEntity"]`
+- [ ] Cast return type: `as TApiPromise<TCreateEntityResult>`
+- [ ] Invalidate related queries in `onSuccess`
+- [ ] Call `options?.onSuccess?.(...data)`
+- [ ] Spread `options` parameter
+
+## Component Patterns
+
+### Loading States
+```typescript
+if (isLoading) {
+  return <div className="flex items-center justify-center p-8">
+    <p className="text-muted-foreground">Loading...</p>
+  </div>;
+}
+```
+
+### Error States
+```typescript
+if (error) {
+  return <div className="flex items-center justify-center p-8">
+    <p className="text-destructive">Error: {error.message}</p>
+  </div>;
+}
+```
+
+### Empty States
+```typescript
+if (items.length === 0) {
+  return <div className="flex flex-col items-center justify-center py-12">
+    <Icon className="mb-4 size-12 text-muted-foreground" />
+    <h2 className="mb-2 text-lg font-medium">No items</h2>
+    <p className="text-muted-foreground">Get started by creating one</p>
+    <Button onClick={handleCreate}>Create</Button>
+  </div>;
+}
+```
+
+## Authentication Flow
+
+1. Firebase handles sign-in/sign-up
+2. On sign-up, create user in backend via `useCreateUser`
+3. Firebase token auto-attached to all API requests
+4. Auth state managed by `AuthProvider`
+5. Protected routes check `user` from `useAuth()`
+
+```typescript
+const { user, loading, signIn, signUp, signOut } = useAuth();
+```
+
+## Data Fetching Flow
+
+1. Create types in `src/types/index.ts`
+2. Create React Query hook in `src/hooks/api/{entity}.ts`
+3. Use hook in component with loading/error handling
+4. Mutations auto-invalidate related queries
+
+```typescript
+const { data, isLoading, error } = useGetConversations();
+const mutation = useCreateConversation({
+  onSuccess: () => toast.success("Created!"),
+});
+```
+
+## Styling Approach
+
+- Use Tailwind utility classes
+- Use `cn()` for conditional classes
+- Use shadcn/ui components
+- Follow mobile-first responsive design
+- Use design tokens (primary, muted, destructive, etc.)
+
+```typescript
+<div className={cn(
+  "flex items-center gap-2 p-4",
+  isActive && "bg-accent",
+  !isActive && "opacity-50"
+)} />
+```
+
+## Common Gotchas
+
+1. **`"use client"` directive** - Required for interactive components
+2. **`next/navigation` vs `next/router`** - Use `next/navigation`
+3. **React Query invalidation** - Must happen in `onSuccess`
+4. **Type prefixes** - Use `T` for all type names
+5. **Path aliases** - Always use `@/` not `../`
+6. **Loading states** - Always handle loading/error/empty
+7. **Toast notifications** - Use for all mutations
+8. **Form validation** - Always use Zod with React Hook Form
+
+## Type Definitions
+
+```typescript
+export interface TEntity {
+  id: string;
+  field: string;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export type TApiPromise<T> = Promise<AxiosResponse<TApiSuccessResponse<T>>>;
+
+export type TQueryOpts<TData> = Omit<
+  UseQueryOptions<AxiosResponse<TApiSuccessResponse<TData>>, Error, TData>,
+  "queryKey" | "queryFn"
+>;
+
+export type TMutationOpts<TVariables, TData = void> = Omit<
+  UseMutationOptions<AxiosResponse<TApiSuccessResponse<TData>>, Error, TVariables, unknown>,
+  "mutationKey" | "mutationFn"
+>;
+```
+
+## Quick Reference
+
+### Imports
+```typescript
+import { useAuth } from "@/hooks/custom/use-auth";
+import { useGetEntity } from "@/hooks/api";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+```
+
+### File Locations
+- Types: `src/types/index.ts`
+- API client: `src/lib/api.ts`
+- Query client: `src/lib/tanstack-query.ts`
+- Utils: `src/lib/utils.ts`
+- Firebase: `src/lib/firebase.ts`
+- Auth hook: `src/hooks/custom/use-auth.ts`
+
+## Adding New Features Checklist
+
+1. [ ] Define types in `src/types/index.ts`
+2. [ ] Create React Query hooks in `src/hooks/api/{entity}.ts`
+3. [ ] Export from `src/hooks/api/index.ts`
+4. [ ] Create UI components in `src/components/`
+5. [ ] Create page in `src/app/` with proper route structure
+6. [ ] Add navigation links if needed
+7. [ ] Handle loading/error/empty states
+8. [ ] Add toast notifications for mutations
+9. [ ] Test authentication flow if protected
+10. [ ] Verify responsive design

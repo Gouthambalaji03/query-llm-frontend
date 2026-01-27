@@ -77,6 +77,7 @@ export default function HistoryPage() {
   const handleDeleteChat = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     deleteChat(id);
+    toast.success("Conversation deleted");
   };
 
   if (loading) {
