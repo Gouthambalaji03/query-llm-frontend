@@ -368,7 +368,7 @@ export default function ChatPage() {
       container.addEventListener("scroll", handleScroll);
       return () => container.removeEventListener("scroll", handleScroll);
     }
-  }, [handleScroll]);
+  }, [handleScroll, loading]);
 
   const handleSendMessage = (message: string) => {
     addMessage(chatId, "user", message);
