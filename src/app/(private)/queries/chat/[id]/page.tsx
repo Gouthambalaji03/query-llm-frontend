@@ -457,7 +457,7 @@ export default function ChatPage() {
                   <ChatMessage
                     message={msg}
                     index={index}
-                    userEmail={user?.email}
+                    userEmail={user?.email || ""}
                     isFirstInGroup={isFirstInGroup}
                     isLastInGroup={isLastInGroup}
                   />

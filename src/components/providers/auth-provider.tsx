@@ -28,21 +28,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<void> => {
     const auth = getFirebaseAuth();
     await signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string): Promise<void> => {
     const auth = getFirebaseAuth();
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await createUserWithEmailAndPassword(auth, email, password);
     
     await createUserMutation.mutateAsync({
       name: email.split("@")[0],
       email: email,
     });
-    
-    return userCredential;
   };
 
   const signOut = async () => {
