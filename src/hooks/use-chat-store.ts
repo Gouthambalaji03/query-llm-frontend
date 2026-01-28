@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
+import { dummyChats } from "@/data/dummy-chats";
 
 export interface Message {
   id: string;
@@ -26,6 +27,8 @@ interface ChatStore {
   getChat: (chatId: string) => Chat | undefined;
   deleteChat: (chatId: string) => void;
   updateChatTitle: (chatId: string, title: string) => void;
+  loadDummyData: () => void;
+  clearAllChats: () => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -103,9 +106,47 @@ export const useChatStore = create<ChatStore>()(
           ),
         }));
       },
+
+      loadDummyData: () => {
+        const currentChats = get().chats;
+        if (currentChats.length === 0) {
+          set({ chats: dummyChats });
+        }
+      },
+
+      clearAllChats: () => {
+        set({ chats: [] });
+      },
     }),
     {
       name: "chat-storage",
+      // Handle date serialization
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          if (!str) return null;
+          const data = JSON.parse(str);
+          // Convert date strings back to Date objects
+          if (data.state?.chats) {
+            data.state.chats = data.state.chats.map((chat: Chat) => ({
+              ...chat,
+              createdAt: new Date(chat.createdAt),
+              updatedAt: new Date(chat.updatedAt),
+              messages: chat.messages.map((msg: Message) => ({
+                ...msg,
+                createdAt: new Date(msg.createdAt),
+              })),
+            }));
+          }
+          return data;
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(name);
+        },
+      },
     }
   )
 );
