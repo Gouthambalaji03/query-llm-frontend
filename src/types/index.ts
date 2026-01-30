@@ -12,7 +12,6 @@ export interface AuthContextType {
 
 export interface TUser {
   id: string;
-  firebase_uid: string;
   name: string;
   email: string;
   created_at: Date;
