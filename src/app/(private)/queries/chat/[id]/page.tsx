@@ -326,11 +326,6 @@ export default function ChatPage() {
 
   const chat = useChatStore((state) => state.getChat(chatId));
   const addMessage = useChatStore((state) => state.addMessage);
-  const loadDummyData = useChatStore((state) => state.loadDummyData);
-
-  useEffect(() => {
-    loadDummyData();
-  }, [loadDummyData]);
 
   useEffect(() => {
     if (!loading && !user) {
