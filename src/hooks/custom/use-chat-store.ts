@@ -3,7 +3,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuidv4 } from "uuid";
-import { dummyChats } from "@/data/dummy-chats";
 
 export interface Message {
   id: string;
@@ -27,7 +26,6 @@ interface ChatStore {
   getChat: (chatId: string) => Chat | undefined;
   deleteChat: (chatId: string) => void;
   updateChatTitle: (chatId: string, title: string) => void;
-  loadDummyData: () => void;
   clearAllChats: () => void;
 }
 
@@ -105,13 +103,6 @@ export const useChatStore = create<ChatStore>()(
             chat.id === chatId ? { ...chat, title } : chat
           ),
         }));
-      },
-
-      loadDummyData: () => {
-        const currentChats = get().chats;
-        if (currentChats.length === 0) {
-          set({ chats: dummyChats });
-        }
       },
 
       clearAllChats: () => {

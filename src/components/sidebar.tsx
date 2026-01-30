@@ -31,16 +31,10 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
   const chats = useChatStore((state) => state.chats);
-  const loadDummyData = useChatStore((state) => state.loadDummyData);
   const [historyExpanded, setHistoryExpanded] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Load dummy data on mount
-  useEffect(() => {
-    loadDummyData();
-  }, [loadDummyData]);
 
   const recentChats = chats.slice(0, 5);
 
