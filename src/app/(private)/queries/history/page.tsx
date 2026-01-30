@@ -22,12 +22,6 @@ export default function HistoryPage() {
   const router = useRouter();
   const chats = useChatStore((state) => state.chats);
   const deleteChat = useChatStore((state) => state.deleteChat);
-  const loadDummyData = useChatStore((state) => state.loadDummyData);
-
-  // Load dummy data on mount
-  useEffect(() => {
-    loadDummyData();
-  }, [loadDummyData]);
 
   useEffect(() => {
     if (!loading && !user) {
