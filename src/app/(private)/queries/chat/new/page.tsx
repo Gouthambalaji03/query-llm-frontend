@@ -11,12 +11,6 @@ export default function NewChatPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const createChat = useChatStore((state) => state.createChat);
-  const loadDummyData = useChatStore((state) => state.loadDummyData);
-
-  // Load dummy data on mount
-  useEffect(() => {
-    loadDummyData();
-  }, [loadDummyData]);
 
   useEffect(() => {
     if (!loading && !user) {
