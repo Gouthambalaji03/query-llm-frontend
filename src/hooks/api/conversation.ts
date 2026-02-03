@@ -124,3 +124,38 @@ export const useDeleteConversation = (options?: TMutationOpts<TDeleteConversatio
     },
   });
 };
+
+export type TAddMessageArgs = {
+  conversationId: string;
+  id?: string;
+  role: "user" | "assistant";
+  content: string;
+  parts?: Array<{
+    type: "text";
+    text: string;
+  } | {
+    type: "tool-invocation";
+    toolCallId: string;
+    toolName: string;
+    state: "call" | "result" | "partial-call";
+    args?: unknown;
+    result?: unknown;
+  }>;
+};
+
+export type TAddMessageResult = TMessage;
+
+export const useAddMessage = (options?: TMutationOpts<TAddMessageArgs, TAddMessageResult>) => {
+  return useMutation({
+    mutationKey: ["useAddMessage"],
+    mutationFn: (args: TAddMessageArgs) => {
+      const { conversationId, ...payload } = args;
+      return api.post(`/conversations/${conversationId}/messages`, payload) as TApiPromise<TAddMessageResult>;
+    },
+    ...options,
+    onSuccess: (...data) => {
+      queryClient.invalidateQueries({ queryKey: ["useGetConversation"] });
+      options?.onSuccess?.(...data);
+    },
+  });
+};
