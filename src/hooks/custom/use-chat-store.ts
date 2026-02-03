@@ -21,12 +21,14 @@ export interface Chat {
 
 interface ChatStore {
   chats: Chat[];
-  createChat: (firstMessage: string) => string;
+  createChat: (firstMessage: string, chatId?: string) => string;
   addMessage: (chatId: string, role: "user" | "assistant", content: string) => void;
   getChat: (chatId: string) => Chat | undefined;
   deleteChat: (chatId: string) => void;
   updateChatTitle: (chatId: string, title: string) => void;
   clearAllChats: () => void;
+  setChat: (chat: Chat) => void;
+  setMessages: (chatId: string, messages: Message[]) => void;
 }
 
 export const useChatStore = create<ChatStore>()(
@@ -34,8 +36,8 @@ export const useChatStore = create<ChatStore>()(
     (set, get) => ({
       chats: [],
 
-      createChat: (firstMessage: string) => {
-        const chatId = uuidv4();
+      createChat: (firstMessage: string, chatId?: string) => {
+        const id = chatId || uuidv4();
         const now = new Date();
 
         // Generate title from first message (first 50 chars)
@@ -44,7 +46,7 @@ export const useChatStore = create<ChatStore>()(
           : firstMessage;
 
         const newChat: Chat = {
-          id: chatId,
+          id,
           title,
           messages: [
             {
@@ -62,7 +64,7 @@ export const useChatStore = create<ChatStore>()(
           chats: [newChat, ...state.chats],
         }));
 
-        return chatId;
+        return id;
       },
 
       addMessage: (chatId: string, role: "user" | "assistant", content: string) => {
@@ -107,6 +109,31 @@ export const useChatStore = create<ChatStore>()(
 
       clearAllChats: () => {
         set({ chats: [] });
+      },
+
+      setChat: (chat: Chat) => {
+        set((state) => {
+          const existingIndex = state.chats.findIndex((c) => c.id === chat.id);
+          if (existingIndex >= 0) {
+            // Update existing chat
+            const newChats = [...state.chats];
+            newChats[existingIndex] = chat;
+            return { chats: newChats };
+          } else {
+            // Add new chat
+            return { chats: [chat, ...state.chats] };
+          }
+        });
+      },
+
+      setMessages: (chatId: string, messages: Message[]) => {
+        set((state) => ({
+          chats: state.chats.map((chat) =>
+            chat.id === chatId
+              ? { ...chat, messages, updatedAt: new Date() }
+              : chat
+          ),
+        }));
       },
     }),
     {

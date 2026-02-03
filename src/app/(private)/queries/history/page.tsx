@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/hooks/custom/use-auth";
 import { useChatStore, Chat } from "@/hooks/custom/use-chat-store";
+import { useGetAllConversations, useDeleteConversation } from "@/hooks/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,14 +20,73 @@ import {
 export default function HistoryPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const chats = useChatStore((state) => state.chats);
-  const deleteChat = useChatStore((state) => state.deleteChat);
+  const localChats = useChatStore((state) => state.chats);
+  const deleteLocalChat = useChatStore((state) => state.deleteChat);
+  const setChat = useChatStore((state) => state.setChat);
+
+  // Fetch conversations from backend
+  const { data: conversationsData, isLoading: isLoadingConversations } = useGetAllConversations(
+    { status: "active" },
+    { enabled: !!user && !loading }
+  );
+
+  // Delete conversation mutation
+  const deleteConversationMutation = useDeleteConversation();
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/login");
     }
   }, [user, loading, router]);
+
+  // Sync backend conversations with local store
+  useEffect(() => {
+    if (conversationsData?.conversations) {
+      conversationsData.conversations.forEach((conv) => {
+        // Check if we already have this chat locally with messages
+        const existingChat = localChats.find((c) => c.id === conv.conversation_id);
+        if (!existingChat) {
+          // Add to local store (without messages - they'll load when opening the chat)
+          const chat: Chat = {
+            id: conv.conversation_id,
+            title: conv.title,
+            messages: [],
+            createdAt: new Date(conv.created_at),
+            updatedAt: new Date(conv.updated_at),
+          };
+          setChat(chat);
+        }
+      });
+    }
+  }, [conversationsData, localChats, setChat]);
+
+  // Only show conversations from the backend (already filtered by user)
+  const chats = useMemo(() => {
+    if (!conversationsData?.conversations) return [];
+
+    const backendIds = new Set(conversationsData.conversations.map((c) => c.conversation_id));
+
+    // Create a map of local chats for quick lookup
+    const localChatMap = new Map(localChats.map((c) => [c.id, c]));
+
+    // Build the final list: prefer local chat data if available (has messages), otherwise use backend data
+    const mergedChats: Chat[] = conversationsData.conversations.map((conv) => {
+      const localChat = localChatMap.get(conv.conversation_id);
+      if (localChat && localChat.messages.length > 0) {
+        return localChat;
+      }
+      return {
+        id: conv.conversation_id,
+        title: conv.title,
+        messages: localChat?.messages || [],
+        createdAt: new Date(conv.created_at),
+        updatedAt: new Date(conv.updated_at),
+      };
+    });
+
+    // Sort by updatedAt descending
+    return mergedChats.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }, [conversationsData, localChats]);
 
   // Group chats by date
   const groupedChats = useMemo(() => {
@@ -69,13 +129,23 @@ export default function HistoryPage() {
     return chatDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
-  const handleDeleteChat = (id: string, e: React.MouseEvent) => {
+  const handleDeleteChat = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    deleteChat(id);
-    toast.success("Conversation deleted");
+
+    // Delete from local store immediately for instant UI feedback
+    deleteLocalChat(id);
+
+    // Delete from backend
+    try {
+      await deleteConversationMutation.mutateAsync({ conversationId: id });
+      toast.success("Conversation deleted");
+    } catch (error) {
+      console.error("Failed to delete conversation from backend:", error);
+      toast.error("Failed to delete conversation");
+    }
   };
 
-  if (loading) {
+  if (loading || isLoadingConversations) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <motion.div

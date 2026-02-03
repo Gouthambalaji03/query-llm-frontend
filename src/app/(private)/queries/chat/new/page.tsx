@@ -2,15 +2,20 @@
 
 import { useAuth } from "@/hooks/custom/use-auth";
 import { useChatStore } from "@/hooks/custom/use-chat-store";
+import { useCreateConversation } from "@/hooks/api";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ChatInput } from "@/components/chat-input";
+import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 
 export default function NewChatPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const createChat = useChatStore((state) => state.createChat);
+  const createConversationMutation = useCreateConversation();
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -18,10 +23,32 @@ export default function NewChatPage() {
     }
   }, [user, loading, router]);
 
-  const handleSendMessage = (message: string) => {
-    // Create new chat with UUID and navigate to it
-    const chatId = createChat(message);
-    router.push(`/queries/chat/${chatId}`);
+  const handleSendMessage = async (message: string) => {
+    if (isCreating) return;
+
+    setIsCreating(true);
+    const chatId = uuidv4();
+    const title = message.length > 50 ? message.substring(0, 50) + "..." : message;
+
+    try {
+      // Create conversation in backend
+      await createConversationMutation.mutateAsync({
+        conversation_id: chatId,
+        title,
+        model: "default",
+        initial_message: message,
+      });
+
+      // Also create in local store for immediate UI update
+      createChat(message, chatId);
+
+      // Navigate to the chat
+      router.push(`/queries/chat/${chatId}`);
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+      toast.error("Failed to create conversation. Please try again.");
+      setIsCreating(false);
+    }
   };
 
   if (loading) {
