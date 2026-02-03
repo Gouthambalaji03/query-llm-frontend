@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuth } from "@/hooks/custom/use-auth";
-import { useChatStore, Message } from "@/hooks/custom/use-chat-store";
+import { useChatStore, Message, Chat } from "@/hooks/custom/use-chat-store";
+import { useGetConversation, useAddMessage } from "@/hooks/api";
 import { useRouter, useParams } from "next/navigation";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -323,9 +324,21 @@ export default function ChatPage() {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [isTyping] = useState(false); // For future AI response simulation
+  const [isSynced, setIsSynced] = useState(false);
 
   const chat = useChatStore((state) => state.getChat(chatId));
-  const addMessage = useChatStore((state) => state.addMessage);
+  const addMessageToStore = useChatStore((state) => state.addMessage);
+  const setChat = useChatStore((state) => state.setChat);
+  const setMessages = useChatStore((state) => state.setMessages);
+
+  // Fetch conversation from backend
+  const { data: conversationData, isLoading: isLoadingConversation } = useGetConversation(
+    { conversationId: chatId },
+    { enabled: !!chatId && !!user && !loading }
+  );
+
+  // Add message mutation
+  const addMessageMutation = useAddMessage();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -333,11 +346,38 @@ export default function ChatPage() {
     }
   }, [user, loading, router]);
 
+  // Sync backend data with local store
   useEffect(() => {
-    if (!loading && user && !chat) {
+    if (conversationData && !isSynced) {
+      const backendMessages = conversationData.user_context_messages || [];
+
+      // Convert backend messages to local store format
+      const messages: Message[] = backendMessages.map((msg) => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        createdAt: new Date(msg.created_at),
+      }));
+
+      // Update or create local chat
+      const localChat: Chat = {
+        id: chatId,
+        title: conversationData.conversation.title,
+        messages,
+        createdAt: new Date(conversationData.conversation.created_at),
+        updatedAt: new Date(conversationData.conversation.updated_at),
+      };
+
+      setChat(localChat);
+      setIsSynced(true);
+    }
+  }, [conversationData, chatId, setChat, isSynced]);
+
+  useEffect(() => {
+    if (!loading && user && !chat && !isLoadingConversation && isSynced) {
       router.push("/queries/chat/new");
     }
-  }, [chat, loading, user, router]);
+  }, [chat, loading, user, router, isLoadingConversation, isSynced]);
 
   // Scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {
@@ -363,8 +403,21 @@ export default function ChatPage() {
     return () => container.removeEventListener("scroll", handleScroll);
   }, [user, chat]);
 
-  const handleSendMessage = (message: string) => {
-    addMessage(chatId, "user", message);
+  const handleSendMessage = async (message: string) => {
+    // Add to local store immediately for instant UI feedback
+    addMessageToStore(chatId, "user", message);
+
+    // Save to backend
+    try {
+      await addMessageMutation.mutateAsync({
+        conversationId: chatId,
+        role: "user",
+        content: message,
+      });
+    } catch (error) {
+      console.error("Failed to save message to backend:", error);
+      // Message is still in local store, so UI continues to work
+    }
   };
 
   const getUserInitial = () => {
@@ -386,7 +439,7 @@ export default function ChatPage() {
     return { isFirstInGroup, isLastInGroup };
   };
 
-  if (loading) {
+  if (loading || isLoadingConversation) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <motion.div

@@ -5,19 +5,17 @@ import type { TUser, TCreateUserInput } from "@/types";
 import type { TApiPromise, TMutationOpts, TQueryOpts } from "@/types/tanstack-query";
 
 export type TLoginArgs = {
-  email: string;
-  password: string;
+  name?: string;
 };
 
-export type TLoginResult = {
-  token: string;
-  user: TUser;
-};
+export type TLoginResult = TUser;
 
 export const useLogin = (options?: TMutationOpts<TLoginArgs, TLoginResult>) => {
   return useMutation({
     mutationKey: ["useLogin"],
     mutationFn: (args: TLoginArgs) => {
+      // Login endpoint uses Firebase token from Authorization header (added by api interceptor)
+      // Optional name is sent in body for new user registration
       return api.post("/auth/login", args) as TApiPromise<TLoginResult>;
     },
     ...options,
@@ -36,6 +34,7 @@ export const useGetMe = (options?: TQueryOpts<TGetMeResult>) => {
     queryFn: () => {
       return api.get("/auth/me") as TApiPromise<TGetMeResult>;
     },
+    select: (response) => response.data.data,
     ...options,
   });
 };

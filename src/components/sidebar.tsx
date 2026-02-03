@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/custom/use-auth";
-import { useChatStore } from "@/hooks/custom/use-chat-store";
+import { useChatStore, Chat } from "@/hooks/custom/use-chat-store";
+import { useGetAllConversations } from "@/hooks/api";
 import {
   Plus,
   Search,
@@ -29,12 +30,36 @@ interface SidebarProps {
 export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
-  const chats = useChatStore((state) => state.chats);
+  const { user, loading, signOut } = useAuth();
+  const localChats = useChatStore((state) => state.chats);
   const [historyExpanded, setHistoryExpanded] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch conversations from backend (only current user's conversations)
+  const { data: conversationsData } = useGetAllConversations(
+    { status: "active" },
+    { enabled: !!user && !loading }
+  );
+
+  // Build chats list from backend data only (filtered by user)
+  const chats = useMemo(() => {
+    if (!conversationsData?.conversations) return [];
+
+    const localChatMap = new Map(localChats.map((c) => [c.id, c]));
+
+    return conversationsData.conversations.map((conv): Chat => {
+      const localChat = localChatMap.get(conv.conversation_id);
+      return {
+        id: conv.conversation_id,
+        title: conv.title,
+        messages: localChat?.messages || [],
+        createdAt: new Date(conv.created_at),
+        updatedAt: new Date(conv.updated_at),
+      };
+    }).sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }, [conversationsData, localChats]);
 
   const recentChats = chats.slice(0, 5);
 
