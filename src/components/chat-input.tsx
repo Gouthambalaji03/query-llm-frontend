@@ -8,13 +8,14 @@ import { ArrowUp } from "lucide-react";
 interface ChatInputProps {
   onSendMessage?: (message: string) => void;
   showGreeting?: boolean;
+  disabled?: boolean;
 }
 
-export function ChatInput({ onSendMessage, showGreeting = true }: ChatInputProps) {
+export function ChatInput({ onSendMessage, showGreeting = true, disabled = false }: ChatInputProps) {
   const [message, setMessage] = useState("");
 
   const handleSubmit = () => {
-    if (message.trim() && onSendMessage) {
+    if (!disabled && message.trim() && onSendMessage) {
       onSendMessage(message);
       setMessage("");
     }
@@ -51,6 +52,7 @@ export function ChatInput({ onSendMessage, showGreeting = true }: ChatInputProps
             onKeyDown={handleKeyDown}
             placeholder="Ask a question about your database..."
             rows={1}
+            disabled={disabled}
             className="w-full resize-none bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
         </div>
@@ -61,10 +63,10 @@ export function ChatInput({ onSendMessage, showGreeting = true }: ChatInputProps
           <Button
             size="icon-sm"
             onClick={handleSubmit}
-            disabled={!message.trim()}
+            disabled={disabled || !message.trim()}
             className={cn(
               "rounded-lg",
-              message.trim()
+              message.trim() && !disabled
                 ? "bg-amber-600 text-white hover:bg-amber-700"
                 : "bg-muted text-muted-foreground"
             )}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@/hooks/custom/use-auth";
-import { useChatStore } from "@/hooks/custom/use-chat-store";
 import { useCreateConversation } from "@/hooks/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -13,7 +12,6 @@ import { toast } from "sonner";
 export default function NewChatPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const createChat = useChatStore((state) => state.createChat);
   const createConversationMutation = useCreateConversation();
   const [isCreating, setIsCreating] = useState(false);
 
@@ -36,11 +34,11 @@ export default function NewChatPage() {
         conversation_id: chatId,
         title,
         model: "default",
-        initial_message: message,
       });
 
-      // Also create in local store for immediate UI update
-      createChat(message, chatId);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(`pending_ai_message:${chatId}`, message);
+      }
 
       // Navigate to the chat
       router.push(`/queries/chat/${chatId}`);
@@ -77,7 +75,7 @@ export default function NewChatPage() {
       transition={{ duration: 0.3 }}
       className="flex flex-1 flex-col items-center justify-center p-8"
     >
-      <ChatInput onSendMessage={handleSendMessage} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={isCreating} />
     </motion.div>
   );
 }

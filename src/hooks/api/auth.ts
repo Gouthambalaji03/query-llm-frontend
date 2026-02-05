@@ -20,22 +20,9 @@ export const useLogin = (options?: TMutationOpts<TLoginArgs, TLoginResult>) => {
     },
     ...options,
     onSuccess: (...data) => {
-      queryClient.invalidateQueries({ queryKey: ["useGetMe"] });
+      queryClient.invalidateQueries({ queryKey: ["useGetUser"] });
       options?.onSuccess?.(...data);
     },
-  });
-};
-
-export type TGetMeResult = TUser;
-
-export const useGetMe = (options?: TQueryOpts<TGetMeResult>) => {
-  return useQuery({
-    queryKey: ["useGetMe"],
-    queryFn: () => {
-      return api.get("/auth/me") as TApiPromise<TGetMeResult>;
-    },
-    select: (response) => response.data.data,
-    ...options,
   });
 };
 
@@ -47,7 +34,7 @@ export const useCreateUser = (options?: TMutationOpts<TCreateUserInput, TUser>) 
     },
     ...options,
     onSuccess: (...data) => {
-      queryClient.invalidateQueries({ queryKey: ["useGetMe"] });
+      queryClient.invalidateQueries({ queryKey: ["useGetUser"] });
       options?.onSuccess?.(...data);
     },
   });

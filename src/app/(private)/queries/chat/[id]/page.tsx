@@ -1,15 +1,20 @@
 "use client";
 
 import { useAuth } from "@/hooks/custom/use-auth";
-import { useChatStore, Message, Chat } from "@/hooks/custom/use-chat-store";
-import { useGetConversation, useAddMessage } from "@/hooks/api";
+import { Message } from "@/hooks/custom/use-chat-store";
+import { useGetConversation } from "@/hooks/api";
 import { useRouter, useParams } from "next/navigation";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChatInput } from "@/components/chat-input";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { streamAiSse } from "@/lib/ai-stream";
+import type { TAiStreamEvent, TToolInvocationPart } from "@/types";
+import { queryClient } from "@/lib/tanstack-query";
+import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid";
 import {
   CodeBlock,
   DataTable,
@@ -189,6 +194,34 @@ function MessageContent({ content }: MessageContentProps) {
   );
 }
 
+interface ToolInvocationProps {
+  part: {
+    type: "tool-invocation";
+    toolCallId: string;
+    toolName: string;
+    state: "call" | "result" | "partial-call";
+    args?: unknown;
+    result?: unknown;
+  };
+}
+
+function ToolInvocation({ part }: ToolInvocationProps) {
+  return (
+    <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-foreground">{part.toolName}</span>
+        <span className="text-muted-foreground">{part.state}</span>
+      </div>
+      {part.args !== undefined && (
+        <pre className="mt-2 whitespace-pre-wrap text-muted-foreground">
+          {JSON.stringify(part.args, null, 2)}
+        </pre>
+      )}
+      {/* Tool results are hidden from UI - only used for agent context */}
+    </div>
+  );
+}
+
 interface ChatMessageProps {
   message: Message;
   index: number;
@@ -287,9 +320,30 @@ function ChatMessage({
           {isUser ? (
             <p className="text-[15px] leading-relaxed">{message.content}</p>
           ) : (
-            <MessageContent content={message.content} />
+            <>
+              {message.content ? (
+                <MessageContent content={message.content} />
+              ) : message.parts?.some((part) => part.type === "tool-invocation") ? (
+                <p className="text-[15px] leading-relaxed text-muted-foreground italic">
+                  Using tool: {message.parts.find((part) => part.type === "tool-invocation")?.toolName}
+                </p>
+              ) : null}
+            </>
           )}
         </motion.div>
+
+        {!isUser && message.parts?.some((part) => part.type === "tool-invocation") && (
+          <div className="w-full">
+            {message.parts
+              ?.filter((part) => part.type === "tool-invocation")
+              .map((part) => (
+                <ToolInvocation
+                  key={part.toolCallId}
+                  part={part as ToolInvocationProps["part"]}
+                />
+              ))}
+          </div>
+        )}
 
         {/* Message Actions - only for assistant messages on last in group */}
         {!isUser && isLastInGroup && (
@@ -322,23 +376,20 @@ export default function ChatPage() {
   const chatId = params.id as string;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isStreamingRef = useRef(false);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [isTyping] = useState(false); // For future AI response simulation
-  const [isSynced, setIsSynced] = useState(false);
-
-  const chat = useChatStore((state) => state.getChat(chatId));
-  const addMessageToStore = useChatStore((state) => state.addMessage);
-  const setChat = useChatStore((state) => state.setChat);
-  const setMessages = useChatStore((state) => state.setMessages);
+  const [pendingMessages, setPendingMessages] = useState<Message[]>([]);
+  const [streamingMessage, setStreamingMessage] = useState<Message | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const isTyping = isStreaming;
+  const [persistedMessages, setPersistedMessages] = useState<Message[]>([]);
 
   // Fetch conversation from backend
   const { data: conversationData, isLoading: isLoadingConversation } = useGetConversation(
     { conversationId: chatId },
     { enabled: !!chatId && !!user && !loading }
   );
-
-  // Add message mutation
-  const addMessageMutation = useAddMessage();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -348,36 +399,64 @@ export default function ChatPage() {
 
   // Sync backend data with local store
   useEffect(() => {
-    if (conversationData && !isSynced) {
-      const backendMessages = conversationData.user_context_messages || [];
-
-      // Convert backend messages to local store format
-      const messages: Message[] = backendMessages.map((msg) => ({
-        id: msg.id,
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-        createdAt: new Date(msg.created_at),
-      }));
-
-      // Update or create local chat
-      const localChat: Chat = {
-        id: chatId,
-        title: conversationData.conversation.title,
-        messages,
-        createdAt: new Date(conversationData.conversation.created_at),
-        updatedAt: new Date(conversationData.conversation.updated_at),
-      };
-
-      setChat(localChat);
-      setIsSynced(true);
-    }
-  }, [conversationData, chatId, setChat, isSynced]);
-
-  useEffect(() => {
-    if (!loading && user && !chat && !isLoadingConversation && isSynced) {
+    if (!loading && user && !conversationData && !isLoadingConversation) {
       router.push("/queries/chat/new");
     }
-  }, [chat, loading, user, router, isLoadingConversation, isSynced]);
+  }, [conversationData, loading, user, router, isLoadingConversation]);
+
+  // Sync backend messages with local state
+  // Only runs when conversationData changes (after refetch), not when isStreaming toggles
+  useEffect(() => {
+    if (!conversationData) return;
+    // Don't sync during active streaming to prevent race conditions
+    if (isStreaming) return;
+
+    const backendMessages = conversationData.user_context_messages || [];
+    const mapped = backendMessages.map((msg) => ({
+      id: msg.id,
+      role: msg.role as "user" | "assistant",
+      content: msg.content,
+      parts: msg.role === "assistant" ? msg.parts : undefined,
+      createdAt: new Date(msg.created_at),
+    }));
+
+    // Only update if we have new data or starting fresh
+    if (mapped.length > 0 || persistedMessages.length === 0) {
+      setPersistedMessages(mapped);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationData]);
+
+  // Clean up pending and streaming messages after they're persisted
+  useEffect(() => {
+    if (isStreaming) return;
+    if (persistedMessages.length === 0) return;
+
+    const backendIds = new Set(persistedMessages.map((msg) => msg.id));
+
+    // Clear streaming message if it's now persisted
+    if (streamingMessage && backendIds.has(streamingMessage.id)) {
+      setStreamingMessage(null);
+    }
+
+    // Clear pending messages that are now persisted
+    // Only update if something was actually filtered out to avoid infinite loop
+    if (pendingMessages.length > 0) {
+      const filtered = pendingMessages.filter((msg) => !backendIds.has(msg.id));
+      if (filtered.length !== pendingMessages.length) {
+        setPendingMessages(filtered);
+      }
+    }
+  }, [isStreaming, persistedMessages, streamingMessage, pendingMessages]);
+
+  const messages = useMemo(() => {
+    const baseMessages = persistedMessages;
+    const backendIds = new Set(baseMessages.map((msg) => msg.id));
+    const pendingFiltered = pendingMessages.filter((msg) => !backendIds.has(msg.id));
+    const streamingFiltered =
+      streamingMessage && !backendIds.has(streamingMessage.id) ? [streamingMessage] : [];
+    return [...baseMessages, ...pendingFiltered, ...streamingFiltered];
+  }, [persistedMessages, pendingMessages, streamingMessage]);
 
   // Scroll to bottom when new messages arrive
   const scrollToBottom = useCallback(() => {
@@ -386,7 +465,23 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chat?.messages, scrollToBottom]);
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (!isStreaming) return;
+    if (showScrollButton) return;
+    scrollToBottom();
+  }, [isStreaming, showScrollButton, streamingMessage?.content]);
+
+  useEffect(() => {
+    if (loading || isLoadingConversation || !user || isStreaming) return;
+    if (typeof window === "undefined") return;
+    const pendingKey = `pending_ai_message:${chatId}`;
+    const pending = sessionStorage.getItem(pendingKey);
+    if (!pending) return;
+    sessionStorage.removeItem(pendingKey);
+    handleSendMessage(pending);
+  }, [loading, isLoadingConversation, user, chatId, isStreaming]);
 
   // Handle scroll to show/hide scroll-to-bottom button
   useEffect(() => {
@@ -401,23 +496,179 @@ export default function ChatPage() {
 
     container.addEventListener("scroll", handleScroll);
     return () => container.removeEventListener("scroll", handleScroll);
-  }, [user, chat]);
+  }, [user, messages.length]);
 
   const handleSendMessage = async (message: string) => {
-    // Add to local store immediately for instant UI feedback
-    addMessageToStore(chatId, "user", message);
+    // Use ref for immediate synchronous check to prevent race conditions
+    if (!user || isStreaming || isStreamingRef.current) {
+      return;
+    }
 
-    // Save to backend
-    try {
-      await addMessageMutation.mutateAsync({
-        conversationId: chatId,
+    // Set ref immediately to block concurrent calls
+    isStreamingRef.current = true;
+
+    const aiUrl = process.env.NEXT_PUBLIC_AI_URL;
+    if (!aiUrl) {
+      toast.error("AI server URL is not configured.");
+      isStreamingRef.current = false;
+      return;
+    }
+
+    if (conversationData && persistedMessages.length === 0) {
+      const backendMessages = conversationData.user_context_messages || [];
+      const mapped = backendMessages.map((msg) => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        parts: msg.role === "assistant" ? msg.parts : undefined,
+        createdAt: new Date(msg.created_at),
+      }));
+      if (mapped.length > 0) {
+        setPersistedMessages(mapped);
+      }
+    }
+
+    const createdAt = new Date();
+    const pendingId = uuidv4();
+    const assistantId = uuidv4();
+
+    setPendingMessages((prev) => [
+      ...prev,
+      {
+        id: pendingId,
         role: "user",
         content: message,
+        createdAt,
+      },
+    ]);
+
+    setStreamingMessage({
+      id: assistantId,
+      role: "assistant",
+      content: "",
+      parts: [],
+      createdAt,
+    });
+
+    setIsStreaming(true);
+
+    try {
+      const token = await user.getIdToken();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      await streamAiSse({
+        url: `${aiUrl}/api/ai/sse`,
+        token,
+        body: {
+          conversation_id: chatId,
+          message,
+          model: "default",
+          user_message_id: pendingId,
+          assistant_message_id: assistantId,
+        },
+        signal: controller.signal,
+        onEvent: (event) => {
+          const payload = event.data as TAiStreamEvent;
+          switch (payload.type) {
+            case "message-start":
+              if (payload.role === "assistant") {
+                setStreamingMessage((prev) =>
+                  prev ? { ...prev, id: payload.messageId } : prev
+                );
+              }
+              break;
+            case "text":
+              setStreamingMessage((prev) =>
+                prev
+                  ? { ...prev, content: `${prev.content}${payload.delta}` }
+                  : prev
+              );
+              break;
+            case "tool-invocation":
+              setStreamingMessage((prev) => {
+                if (!prev) return prev;
+                const parts = prev.parts ? [...prev.parts] : [];
+                parts.push({
+                  type: "tool-invocation",
+                  toolCallId: payload.toolCallId,
+                  toolName: payload.toolName,
+                  state: payload.state,
+                  args: payload.args,
+                });
+                return { ...prev, parts };
+              });
+              break;
+            case "tool-result":
+              setStreamingMessage((prev) => {
+                if (!prev) return prev;
+                let found = false;
+                const parts = (prev.parts ?? []).map((part) => {
+                  if (
+                    part.type === "tool-invocation" &&
+                    part.toolCallId === payload.toolCallId
+                  ) {
+                    found = true;
+                    const updated: TToolInvocationPart = {
+                      ...part,
+                      state: "result",
+                      result: payload.result,
+                    };
+                    return updated;
+                  }
+                  return part;
+                });
+                if (!found) {
+                  const fallback: TToolInvocationPart = {
+                    type: "tool-invocation",
+                    toolCallId: payload.toolCallId,
+                    toolName: payload.toolName,
+                    state: "result",
+                    result: payload.result,
+                  };
+                  parts.push(fallback);
+                }
+                return { ...prev, parts };
+              });
+              break;
+            case "chat-complete":
+              isStreamingRef.current = false;
+              setIsStreaming(false);
+              queryClient.invalidateQueries({ queryKey: ["useGetConversation"] });
+              queryClient.invalidateQueries({ queryKey: ["useGetAllConversations"] });
+              break;
+            case "error":
+              toast.error(payload.message || "Streaming error");
+              isStreamingRef.current = false;
+              setIsStreaming(false);
+              break;
+            case "cancel":
+              isStreamingRef.current = false;
+              setIsStreaming(false);
+              queryClient.invalidateQueries({ queryKey: ["useGetConversation"] });
+              queryClient.invalidateQueries({ queryKey: ["useGetAllConversations"] });
+              break;
+            default:
+              break;
+          }
+        },
       });
     } catch (error) {
-      console.error("Failed to save message to backend:", error);
-      // Message is still in local store, so UI continues to work
+      if (error instanceof DOMException && error.name === "AbortError") {
+        toast("Streaming cancelled.");
+      } else {
+        console.error("AI stream failed:", error);
+        toast.error("AI stream failed.");
+      }
+      isStreamingRef.current = false;
+      setIsStreaming(false);
+    } finally {
+      abortControllerRef.current = null;
     }
+  };
+
+  const handleCancelStream = () => {
+    abortControllerRef.current?.abort();
   };
 
   const getUserInitial = () => {
@@ -454,9 +705,10 @@ export default function ChatPage() {
     );
   }
 
-  if (!user || !chat) {
+  if (!user || !conversationData) {
     return null;
   }
+
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden bg-background">
@@ -476,10 +728,10 @@ export default function ChatPage() {
             <ArrowLeft className="size-5" />
           </Button>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold">{chat.title}</h1>
+            <h1 className="truncate text-base font-semibold">{conversationData.conversation.title}</h1>
             <p className="text-xs text-muted-foreground">
-              {chat.messages.length}{" "}
-              {chat.messages.length === 1 ? "message" : "messages"}
+              {messages.length}{" "}
+              {messages.length === 1 ? "message" : "messages"}
             </p>
           </div>
         </div>
@@ -495,9 +747,9 @@ export default function ChatPage() {
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto relative">
         <div className="mx-auto max-w-3xl px-4 py-8">
           <AnimatePresence mode="popLayout">
-            {chat.messages.map((msg, index) => {
+            {messages.map((msg, index) => {
               const { isFirstInGroup, isLastInGroup } = getMessageGroupInfo(
-                chat.messages,
+                messages,
                 index
               );
               return (
@@ -537,7 +789,14 @@ export default function ChatPage() {
         className="border-t border-border bg-background p-4"
       >
         <div className="mx-auto max-w-3xl">
-          <ChatInput onSendMessage={handleSendMessage} showGreeting={false} />
+          {isStreaming && (
+            <div className="mb-3 flex justify-end">
+              <Button variant="outline" size="sm" onClick={handleCancelStream}>
+                Stop
+              </Button>
+            </div>
+          )}
+          <ChatInput onSendMessage={handleSendMessage} showGreeting={false} disabled={isStreaming} />
         </div>
       </motion.div>
     </div>

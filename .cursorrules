@@ -3,6 +3,9 @@
 ## Project Overview
 This is a Next.js 16 React application with TypeScript, TanStack Query (React Query), Firebase Auth, and Tailwind CSS.
 
+## Cross-Repo Links
+- Root index: `AGENTS.md`
+
 ## Tech Stack
 - Framework: Next.js 16 (App Router)
 - Runtime: React 19
@@ -124,6 +127,7 @@ export type TGetEntityArgs = {
 };
 
 export type TGetEntityResult = TEntity;
+export type TCreateEntityResult = void;
 
 export const useGetEntity = (
   args: TGetEntityArgs,
@@ -141,8 +145,6 @@ export const useGetEntity = (
 
 export type TCreateEntityArgs = TCreateEntityInput;
 
-export type TCreateEntityResult = TEntity;
-
 export const useCreateEntity = (
   options?: TMutationOpts<TCreateEntityArgs, TCreateEntityResult>
 ) => {
@@ -159,6 +161,11 @@ export const useCreateEntity = (
   });
 };
 ```
+
+## SOP Updates
+- Do not use a separate `useGetMe` hook; use `useGetUser` with `GET /api/users/:user_id`.
+- Message creation uses `PATCH /api/conversations/:conversation_id` with `message` payload.
+- Create/Update/Delete endpoints return no `data` payloads in success responses.
 
 ### Component Pattern
 ```typescript

@@ -3,6 +3,9 @@
 ## Project Context
 This is a Next.js 16 React application with TypeScript, using App Router, TanStack Query, Firebase Auth, and Tailwind CSS.
 
+## Cross-Repo Links
+- Root index: `AGENTS.md`
+
 ## Critical Conventions
 
 ### Naming Rules
@@ -52,7 +55,7 @@ export const useGetEntity = (
 };
 
 export type TCreateEntityArgs = { name: string };
-export type TCreateEntityResult = TEntity;
+export type TCreateEntityResult = void;
 
 export const useCreateEntity = (
   options?: TMutationOpts<TCreateEntityArgs, TCreateEntityResult>
@@ -198,6 +201,11 @@ export function MyForm() {
 - [ ] Use descriptive mutationKey: `["useCreateEntity"]`
 - [ ] Cast return type: `as TApiPromise<TCreateEntityResult>`
 - [ ] Invalidate related queries in `onSuccess`
+
+## SOP Updates
+- Do not use a separate `useGetMe` hook; use `useGetUser` with `GET /api/users/:user_id`.
+- Message creation uses `PATCH /api/conversations/:conversation_id` with `message` payload.
+- Create/Update/Delete endpoints return no `data` payloads in success responses.
 - [ ] Call `options?.onSuccess?.(...data)`
 - [ ] Spread `options` parameter
 
