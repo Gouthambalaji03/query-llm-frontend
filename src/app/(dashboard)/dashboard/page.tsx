@@ -1,15 +1,18 @@
 "use client";
 
 import { useAuth } from "@/hooks/custom/use-auth";
-import { useChatStore } from "@/hooks/custom/use-chat-store";
+import { useCreateConversation } from "@/hooks/api";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ChatInput } from "@/components/chat-input";
+import { v4 as uuidv4 } from "uuid";
+import { toast } from "sonner";
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const createChat = useChatStore((state) => state.createChat);
+  const createConversationMutation = useCreateConversation();
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -17,9 +20,30 @@ export default function DashboardPage() {
     }
   }, [user, loading, router]);
 
-  const handleSendMessage = (message: string) => {
-    const chatId = createChat(message);
-    router.push(`/queries/chat/${chatId}`);
+  const handleSendMessage = async (message: string) => {
+    if (isCreating) return;
+
+    setIsCreating(true);
+    const chatId = uuidv4();
+    const title = message.length > 50 ? message.substring(0, 50) + "..." : message;
+
+    try {
+      await createConversationMutation.mutateAsync({
+        conversation_id: chatId,
+        title,
+        model: "default",
+      });
+
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(`pending_ai_message:${chatId}`, message);
+      }
+
+      router.push(`/queries/chat/${chatId}`);
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+      toast.error("Failed to create conversation. Please try again.");
+      setIsCreating(false);
+    }
   };
 
   if (loading) {
@@ -36,7 +60,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center p-8">
-      <ChatInput onSendMessage={handleSendMessage} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={isCreating} />
     </div>
   );
 }

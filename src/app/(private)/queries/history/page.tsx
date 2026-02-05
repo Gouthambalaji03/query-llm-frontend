@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/custom/use-auth";
-import { useChatStore, Chat } from "@/hooks/custom/use-chat-store";
+import type { Chat } from "@/hooks/custom/use-chat-store";
 import { useGetAllConversations, useDeleteConversation } from "@/hooks/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo } from "react";
@@ -20,12 +20,12 @@ import {
 export default function HistoryPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const localChats = useChatStore((state) => state.chats);
-  const deleteLocalChat = useChatStore((state) => state.deleteChat);
-  const setChat = useChatStore((state) => state.setChat);
-
   // Fetch conversations from backend
-  const { data: conversationsData, isLoading: isLoadingConversations } = useGetAllConversations(
+  const {
+    data: conversationsData,
+    isLoading: isLoadingConversations,
+    isFetching: isFetchingConversations,
+  } = useGetAllConversations(
     { status: "active" },
     { enabled: !!user && !loading }
   );
@@ -39,54 +39,20 @@ export default function HistoryPage() {
     }
   }, [user, loading, router]);
 
-  // Sync backend conversations with local store
-  useEffect(() => {
-    if (conversationsData?.conversations) {
-      conversationsData.conversations.forEach((conv) => {
-        // Check if we already have this chat locally with messages
-        const existingChat = localChats.find((c) => c.id === conv.conversation_id);
-        if (!existingChat) {
-          // Add to local store (without messages - they'll load when opening the chat)
-          const chat: Chat = {
-            id: conv.conversation_id,
-            title: conv.title,
-            messages: [],
-            createdAt: new Date(conv.created_at),
-            updatedAt: new Date(conv.updated_at),
-          };
-          setChat(chat);
-        }
-      });
-    }
-  }, [conversationsData, localChats, setChat]);
-
   // Only show conversations from the backend (already filtered by user)
   const chats = useMemo(() => {
     if (!conversationsData?.conversations) return [];
 
-    const backendIds = new Set(conversationsData.conversations.map((c) => c.conversation_id));
-
-    // Create a map of local chats for quick lookup
-    const localChatMap = new Map(localChats.map((c) => [c.id, c]));
-
-    // Build the final list: prefer local chat data if available (has messages), otherwise use backend data
-    const mergedChats: Chat[] = conversationsData.conversations.map((conv) => {
-      const localChat = localChatMap.get(conv.conversation_id);
-      if (localChat && localChat.messages.length > 0) {
-        return localChat;
-      }
-      return {
-        id: conv.conversation_id,
-        title: conv.title,
-        messages: localChat?.messages || [],
-        createdAt: new Date(conv.created_at),
-        updatedAt: new Date(conv.updated_at),
-      };
-    });
+    const mapped: Chat[] = conversationsData.conversations.map((conv) => ({
+      id: conv.conversation_id,
+      title: conv.title,
+      createdAt: new Date(conv.created_at),
+      updatedAt: new Date(conv.updated_at),
+    }));
 
     // Sort by updatedAt descending
-    return mergedChats.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-  }, [conversationsData, localChats]);
+    return mapped.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  }, [conversationsData]);
 
   // Group chats by date
   const groupedChats = useMemo(() => {
@@ -132,9 +98,6 @@ export default function HistoryPage() {
   const handleDeleteChat = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
-    // Delete from local store immediately for instant UI feedback
-    deleteLocalChat(id);
-
     // Delete from backend
     try {
       await deleteConversationMutation.mutateAsync({ conversationId: id });
@@ -145,7 +108,7 @@ export default function HistoryPage() {
     }
   };
 
-  if (loading || isLoadingConversations) {
+  if (loading || isLoadingConversations || isFetchingConversations) {
     return (
       <div className="flex flex-1 items-center justify-center">
         <motion.div
@@ -284,12 +247,8 @@ export default function HistoryPage() {
                                 </h3>
                                 <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1">
-                                    <MessageSquare className="size-3" />
-                                    {chat.messages.length} {chat.messages.length === 1 ? "message" : "messages"}
-                                  </span>
-                                  <span className="flex items-center gap-1">
                                     <Clock className="size-3" />
-                                    {formatTime(chat.createdAt)}
+                                    Updated {formatTime(chat.updatedAt)}
                                   </span>
                                 </div>
                               </div>

@@ -65,7 +65,7 @@ export const useGetConversation = (
 
 export type TCreateConversationArgs = TCreateConversationInput;
 
-export type TCreateConversationResult = TConversation;
+export type TCreateConversationResult = void;
 
 export const useCreateConversation = (
   options?: TMutationOpts<TCreateConversationArgs, TCreateConversationResult>
@@ -87,7 +87,7 @@ export type TUpdateConversationArgs = {
   conversationId: string;
 } & TUpdateConversationInput;
 
-export type TUpdateConversationResult = TConversation;
+export type TUpdateConversationResult = void;
 
 export const useUpdateConversation = (
   options?: TMutationOpts<TUpdateConversationArgs, TUpdateConversationResult>
@@ -120,41 +120,6 @@ export const useDeleteConversation = (options?: TMutationOpts<TDeleteConversatio
     ...options,
     onSuccess: (...data) => {
       queryClient.invalidateQueries({ queryKey: ["useGetAllConversations"] });
-      options?.onSuccess?.(...data);
-    },
-  });
-};
-
-export type TAddMessageArgs = {
-  conversationId: string;
-  id?: string;
-  role: "user" | "assistant";
-  content: string;
-  parts?: Array<{
-    type: "text";
-    text: string;
-  } | {
-    type: "tool-invocation";
-    toolCallId: string;
-    toolName: string;
-    state: "call" | "result" | "partial-call";
-    args?: unknown;
-    result?: unknown;
-  }>;
-};
-
-export type TAddMessageResult = TMessage;
-
-export const useAddMessage = (options?: TMutationOpts<TAddMessageArgs, TAddMessageResult>) => {
-  return useMutation({
-    mutationKey: ["useAddMessage"],
-    mutationFn: (args: TAddMessageArgs) => {
-      const { conversationId, ...payload } = args;
-      return api.post(`/conversations/${conversationId}/messages`, payload) as TApiPromise<TAddMessageResult>;
-    },
-    ...options,
-    onSuccess: (...data) => {
-      queryClient.invalidateQueries({ queryKey: ["useGetConversation"] });
       options?.onSuccess?.(...data);
     },
   });

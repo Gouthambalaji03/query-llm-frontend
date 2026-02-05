@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Database } from "lucide-react";
+import { Database, Sparkles } from "lucide-react";
 
 export function TypingIndicator() {
   return (
@@ -9,30 +9,25 @@ export function TypingIndicator() {
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="flex gap-4"
+      className="flex gap-4 ml-10"
     >
-      {/* Avatar */}
-      <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm">
-        <Database className="size-4" />
-      </div>
 
-      {/* Typing Bubble */}
-      <div className="flex items-center gap-1 rounded-2xl rounded-tl-md bg-card border border-border/60 px-5 py-4 shadow-sm">
+      {/* Generating Indicator */}
+      <div className="flex items-center gap-2">
         <motion.span
-          className="size-2 rounded-full bg-muted-foreground/60"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-        />
+          className="text-primary"
+          animate={{ rotate: [0, 12, -12, 0], scale: [1, 1.15, 1] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <Sparkles className="size-4" />
+        </motion.span>
         <motion.span
-          className="size-2 rounded-full bg-muted-foreground/60"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-        />
-        <motion.span
-          className="size-2 rounded-full bg-muted-foreground/60"
-          animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-        />
+          className="text-xs font-medium text-foreground"
+          animate={{ opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 1.2, repeat: Infinity }}
+        >
+          Generating
+        </motion.span>
       </div>
     </motion.div>
   );

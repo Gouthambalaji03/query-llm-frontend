@@ -64,6 +64,7 @@ export interface TUpdateConversationInput {
   title?: string;
   model?: string;
   status?: "active" | "archived";
+  message?: TMessageInput;
 }
 
 export interface TTextPart {
@@ -78,6 +79,13 @@ export interface TToolInvocationPart {
   state: "call" | "result" | "partial-call";
   args?: unknown;
   result?: unknown;
+}
+
+export interface TMessageInput {
+  id?: string;
+  role: "user" | "assistant";
+  content: string;
+  parts?: Array<TTextPart | TToolInvocationPart>;
 }
 
 export interface TUserMessage {
@@ -103,7 +111,7 @@ export interface TConversationWithMessages extends TConversation {
 
 export interface TApiSuccessResponse<T> {
   success: true;
-  data: T;
+  data?: T;
   message?: string;
 }
 
@@ -117,3 +125,23 @@ export interface TApiErrorResponse {
 }
 
 export type TApiResponse<T> = TApiSuccessResponse<T> | TApiErrorResponse;
+
+export type TAiStreamEvent =
+  | { type: "chat-start"; conversationId: string; messageId: string; model: string }
+  | { type: "message-start"; messageId: string; role: "user" | "assistant" | "system" | "tool" }
+  | { type: "text"; messageId: string; delta: string; isFinal?: boolean }
+  | {
+      type: "tool-invocation";
+      toolCallId: string;
+      toolName: string;
+      state: "call" | "result" | "partial-call";
+      args?: unknown;
+      result?: unknown;
+    }
+  | { type: "tool-result"; toolCallId: string; toolName: string; result: unknown }
+  | { type: "usage"; promptTokens: number; completionTokens: number; totalTokens: number }
+  | { type: "chat-name"; title: string }
+  | { type: "chat-complete"; messageId: string; finishReason?: string }
+  | { type: "error"; code: string; message: string; details?: unknown }
+  | { type: "ping"; ts: number }
+  | { type: "cancel"; reason?: string };

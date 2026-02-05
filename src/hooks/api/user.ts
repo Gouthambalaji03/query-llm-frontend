@@ -35,6 +35,7 @@ export const useGetUser = (args: TGetUserArgs, options?: TQueryOpts<TGetUserResu
     queryFn: () => {
       return api.get(`/users/${args.userId}`) as TApiPromise<TGetUserResult>;
     },
+    select: (response) => response.data.data,
     enabled: !!args.userId,
     ...options,
   });
@@ -57,7 +58,6 @@ export const useUpdateUser = (options?: TMutationOpts<TUpdateUserArgs, TUpdateUs
     onSuccess: (...data) => {
       queryClient.invalidateQueries({ queryKey: ["useGetUser"] });
       queryClient.invalidateQueries({ queryKey: ["useGetAllUsers"] });
-      queryClient.invalidateQueries({ queryKey: ["useGetMe"] });
       options?.onSuccess?.(...data);
     },
   });
