@@ -138,7 +138,7 @@ export type TAiStreamEvent =
       args?: unknown;
       result?: unknown;
     }
-  | { type: "tool-result"; toolCallId: string; toolName: string; result: unknown }
+  // Note: tool-result events removed - tool results are stored in backend but only tool-invocation (UI) is streamed
   | { type: "usage"; promptTokens: number; completionTokens: number; totalTokens: number }
   | { type: "chat-name"; title: string }
   | { type: "chat-complete"; messageId: string; finishReason?: string }

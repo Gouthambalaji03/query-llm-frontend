@@ -11,10 +11,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Database } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { streamAiSse } from "@/lib/ai-stream";
-import type { TAiStreamEvent, TToolInvocationPart } from "@/types";
+import type { TAiStreamEvent } from "@/types";
 import { queryClient } from "@/lib/tanstack-query";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
+import { getModelLabel } from "@/constants/models";
 import {
   CodeBlock,
   DataTable,
@@ -320,30 +321,36 @@ function ChatMessage({
           {isUser ? (
             <p className="text-[15px] leading-relaxed">{message.content}</p>
           ) : (
-            <>
-              {message.content ? (
+            <div className="w-full space-y-3">
+              {/* Render parts in order: tool invocations first, then text */}
+              {message.parts && message.parts.length > 0 ? (
+                message.parts.map((part, index) => {
+                  if (part.type === "tool-invocation") {
+                    return (
+                      <ToolInvocation
+                        key={part.toolCallId || index}
+                        part={part as ToolInvocationProps["part"]}
+                      />
+                    );
+                  } else if (part.type === "text") {
+                    return (
+                      <div key={index}>
+                        <MessageContent content={part.text} />
+                      </div>
+                    );
+                  }
+                  return null;
+                })
+              ) : message.content ? (
                 <MessageContent content={message.content} />
-              ) : message.parts?.some((part) => part.type === "tool-invocation") ? (
+              ) : (
                 <p className="text-[15px] leading-relaxed text-muted-foreground italic">
-                  Using tool: {message.parts.find((part) => part.type === "tool-invocation")?.toolName}
+                  No response
                 </p>
-              ) : null}
-            </>
+              )}
+            </div>
           )}
         </motion.div>
-
-        {!isUser && message.parts?.some((part) => part.type === "tool-invocation") && (
-          <div className="w-full">
-            {message.parts
-              ?.filter((part) => part.type === "tool-invocation")
-              .map((part) => (
-                <ToolInvocation
-                  key={part.toolCallId}
-                  part={part as ToolInvocationProps["part"]}
-                />
-              ))}
-          </div>
-        )}
 
         {/* Message Actions - only for assistant messages on last in group */}
         {!isUser && isLastInGroup && (
@@ -561,7 +568,7 @@ export default function ChatPage() {
         body: {
           conversation_id: chatId,
           message,
-          model: "default",
+          model: conversationData?.conversation.ai_model || "default",
           user_message_id: pendingId,
           assistant_message_id: assistantId,
         },
@@ -597,38 +604,8 @@ export default function ChatPage() {
                 return { ...prev, parts };
               });
               break;
-            case "tool-result":
-              setStreamingMessage((prev) => {
-                if (!prev) return prev;
-                let found = false;
-                const parts = (prev.parts ?? []).map((part) => {
-                  if (
-                    part.type === "tool-invocation" &&
-                    part.toolCallId === payload.toolCallId
-                  ) {
-                    found = true;
-                    const updated: TToolInvocationPart = {
-                      ...part,
-                      state: "result",
-                      result: payload.result,
-                    };
-                    return updated;
-                  }
-                  return part;
-                });
-                if (!found) {
-                  const fallback: TToolInvocationPart = {
-                    type: "tool-invocation",
-                    toolCallId: payload.toolCallId,
-                    toolName: payload.toolName,
-                    state: "result",
-                    result: payload.result,
-                  };
-                  parts.push(fallback);
-                }
-                return { ...prev, parts };
-              });
-              break;
+            // Note: tool-result events are no longer sent from backend
+            // Tool results are stored in backend but only tool-invocation (UI) is streamed
             case "chat-complete":
               isStreamingRef.current = false;
               setIsStreaming(false);
@@ -729,10 +706,14 @@ export default function ChatPage() {
           </Button>
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold">{conversationData.conversation.title}</h1>
-            <p className="text-xs text-muted-foreground">
-              {messages.length}{" "}
-              {messages.length === 1 ? "message" : "messages"}
-            </p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                {messages.length}{" "}
+                {messages.length === 1 ? "message" : "messages"}
+              </span>
+              <span>•</span>
+              <span>{getModelLabel(conversationData.conversation.ai_model)}</span>
+            </div>
           </div>
         </div>
         <div

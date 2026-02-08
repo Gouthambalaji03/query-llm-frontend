@@ -5,6 +5,7 @@ import { useCreateConversation } from "@/hooks/api";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ChatInput } from "@/components/chat-input";
+import { DEFAULT_MODEL } from "@/constants/models";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "sonner";
 
@@ -31,7 +32,7 @@ export default function DashboardPage() {
       await createConversationMutation.mutateAsync({
         conversation_id: chatId,
         title,
-        model: "default",
+        model: DEFAULT_MODEL,
       });
 
       if (typeof window !== "undefined") {
