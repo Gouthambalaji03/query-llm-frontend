@@ -9,9 +9,19 @@ interface ChatInputProps {
   onSendMessage?: (message: string) => void;
   showGreeting?: boolean;
   disabled?: boolean;
+  showModelSelector?: boolean;
+  selectedModel?: string;
+  onModelChange?: (model: string) => void;
 }
 
-export function ChatInput({ onSendMessage, showGreeting = true, disabled = false }: ChatInputProps) {
+export function ChatInput({
+  onSendMessage,
+  showGreeting = true,
+  disabled = false,
+  showModelSelector = false,
+  selectedModel,
+  onModelChange,
+}: ChatInputProps) {
   const [message, setMessage] = useState("");
 
   const handleSubmit = () => {
@@ -58,8 +68,34 @@ export function ChatInput({ onSendMessage, showGreeting = true, disabled = false
         </div>
 
         {/* Bottom Bar */}
-        <div className="flex items-center justify-end border-t border-border px-3 py-2">
-          {/* Submit Button */}
+        <div className={cn(
+          "flex items-center border-t border-border px-3 py-2",
+          showModelSelector ? "justify-between" : "justify-end"
+        )}>
+          {/* Model Selector - Left Side */}
+          {showModelSelector && selectedModel && onModelChange && (
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedModel}
+                onChange={(e) => onModelChange(e.target.value)}
+                disabled={disabled}
+                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-amber-600 disabled:opacity-50"
+              >
+                <option value="openai:gpt-4o">GPT-4o</option>
+                <option value="openai:gpt-4o-mini">GPT-4o Mini</option>
+                <option value="openai:o1">o1</option>
+                <option value="openai:o1-mini">o1 Mini</option>
+                <option value="anthropic:claude-sonnet-4.5">Claude Sonnet 4.5</option>
+                <option value="anthropic:claude-opus-4.6">Claude Opus 4.6</option>
+                <option value="anthropic:claude-haiku-4.5">Claude Haiku 4.5</option>
+                <option value="gemini:gemini-2.5-flash">Gemini 2.5 Flash</option>
+                <option value="gemini:gemini-2.5-pro">Gemini 2.5 Pro</option>
+                <option value="gemini:gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+              </select>
+            </div>
+          )}
+
+          {/* Submit Button - Right Side */}
           <Button
             size="icon-sm"
             onClick={handleSubmit}

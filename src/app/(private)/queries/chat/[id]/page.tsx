@@ -15,6 +15,7 @@ import type { TAiStreamEvent, TToolInvocationPart } from "@/types";
 import { queryClient } from "@/lib/tanstack-query";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
+import { getModelLabel } from "@/constants/models";
 import {
   CodeBlock,
   DataTable,
@@ -561,7 +562,7 @@ export default function ChatPage() {
         body: {
           conversation_id: chatId,
           message,
-          model: "default",
+          model: conversationData?.conversation.ai_model || "default",
           user_message_id: pendingId,
           assistant_message_id: assistantId,
         },
@@ -729,10 +730,14 @@ export default function ChatPage() {
           </Button>
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold">{conversationData.conversation.title}</h1>
-            <p className="text-xs text-muted-foreground">
-              {messages.length}{" "}
-              {messages.length === 1 ? "message" : "messages"}
-            </p>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>
+                {messages.length}{" "}
+                {messages.length === 1 ? "message" : "messages"}
+              </span>
+              <span>•</span>
+              <span>{getModelLabel(conversationData.conversation.ai_model)}</span>
+            </div>
           </div>
         </div>
         <div

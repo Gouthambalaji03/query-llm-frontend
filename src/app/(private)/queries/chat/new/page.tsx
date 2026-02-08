@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ChatInput } from "@/components/chat-input";
+import { DEFAULT_MODEL } from "@/constants/models";
 import { v4 as uuidv4 } from "uuid";
 import { toast } from "sonner";
 
@@ -14,6 +15,7 @@ export default function NewChatPage() {
   const router = useRouter();
   const createConversationMutation = useCreateConversation();
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -33,7 +35,7 @@ export default function NewChatPage() {
       await createConversationMutation.mutateAsync({
         conversation_id: chatId,
         title,
-        model: "default",
+        model: selectedModel,
       });
 
       if (typeof window !== "undefined") {
@@ -75,7 +77,14 @@ export default function NewChatPage() {
       transition={{ duration: 0.3 }}
       className="flex flex-1 flex-col items-center justify-center p-8"
     >
-      <ChatInput onSendMessage={handleSendMessage} disabled={isCreating} />
+      <ChatInput
+        onSendMessage={handleSendMessage}
+        disabled={isCreating}
+        showGreeting={true}
+        showModelSelector={true}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+      />
     </motion.div>
   );
 }
