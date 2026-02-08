@@ -405,11 +405,9 @@ export default function ChatPage() {
   }, [conversationData, loading, user, router, isLoadingConversation]);
 
   // Sync backend messages with local state
-  // Only runs when conversationData changes (after refetch), not when isStreaming toggles
+  // Only runs when conversationData changes (after refetch)
   useEffect(() => {
     if (!conversationData) return;
-    // Don't sync during active streaming to prevent race conditions
-    if (isStreaming) return;
 
     const backendMessages = conversationData.user_context_messages || [];
     const mapped = backendMessages.map((msg) => ({
@@ -634,8 +632,11 @@ export default function ChatPage() {
             case "chat-complete":
               isStreamingRef.current = false;
               setIsStreaming(false);
-              queryClient.invalidateQueries({ queryKey: ["useGetConversation"] });
-              queryClient.invalidateQueries({ queryKey: ["useGetAllConversations"] });
+              // Delayed refetch to allow backend to save messages after stream completes
+              setTimeout(() => {
+                queryClient.invalidateQueries({ queryKey: ["useGetConversation"] });
+                queryClient.invalidateQueries({ queryKey: ["useGetAllConversations"] });
+              }, 500);
               break;
             case "error":
               toast.error(payload.message || "Streaming error");
@@ -645,8 +646,7 @@ export default function ChatPage() {
             case "cancel":
               isStreamingRef.current = false;
               setIsStreaming(false);
-              queryClient.invalidateQueries({ queryKey: ["useGetConversation"] });
-              queryClient.invalidateQueries({ queryKey: ["useGetAllConversations"] });
+              // Don't invalidate queries - let cleanup effect handle temporary messages
               break;
             default:
               break;
