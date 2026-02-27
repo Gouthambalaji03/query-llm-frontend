@@ -9,7 +9,7 @@ export default function Home() {
           Query LLM
         </h1>
         <p className="text-xl text-muted-foreground">
-          An intelligent agent that can perform database queries and provide insights.
+          Get clear answers to any question.
         </p>
         <div className="flex gap-4 justify-center">
           <Button asChild size="lg">

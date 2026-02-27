@@ -17,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Query LLM",
-  description: "An intelligent agent that can perform database queries and provide insights.",
+  description: "Get clear answers to any question with AI.",
 };
 
 export default function RootLayout({

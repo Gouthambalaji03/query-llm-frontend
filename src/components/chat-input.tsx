@@ -4,6 +4,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ArrowUp } from "lucide-react";
+import { AVAILABLE_MODELS } from "@/constants/models";
 
 interface ChatInputProps {
   onSendMessage?: (message: string) => void;
@@ -81,16 +82,11 @@ export function ChatInput({
                 disabled={disabled}
                 className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-amber-600 disabled:opacity-50"
               >
-                <option value="openai:gpt-4o">GPT-4o</option>
-                <option value="openai:gpt-4o-mini">GPT-4o Mini</option>
-                <option value="openai:o1">o1</option>
-                <option value="openai:o1-mini">o1 Mini</option>
-                <option value="anthropic:claude-sonnet-4.5">Claude Sonnet 4.5</option>
-                <option value="anthropic:claude-opus-4.6">Claude Opus 4.6</option>
-                <option value="anthropic:claude-haiku-4.5">Claude Haiku 4.5</option>
-                <option value="gemini:gemini-2.5-flash">Gemini 2.5 Flash</option>
-                <option value="gemini:gemini-2.5-pro">Gemini 2.5 Pro</option>
-                <option value="gemini:gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+                {AVAILABLE_MODELS.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
               </select>
             </div>
           )}
