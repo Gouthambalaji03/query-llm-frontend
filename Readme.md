@@ -1,6 +1,6 @@
-# Query LLM:
+# Query LLM
 
-An intelligent agent that can perform database queries and provide insights.
+Get clear answers to any question.
 
 ## Overview
 
