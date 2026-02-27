@@ -7,35 +7,41 @@ export interface ModelOption {
 
 export const AVAILABLE_MODELS: ModelOption[] = [
   // OpenAI – GPT-5 chat only
-  {
-    value: 'openai:gpt-5',
-    label: 'GPT-5',
-    provider: 'openai',
-    description: 'Chat model'
-  },
-  {
-    value: 'openai:gpt-5-mini',
-    label: 'GPT-5 Mini',
-    provider: 'openai',
-    description: 'Compact chat model'
-  },
+  // {
+  //   value: 'openai:gpt-5',
+  //   label: 'GPT-5',
+  //   provider: 'openai',
+  //   description: 'Chat model'
+  // },
+  // {
+  //   value: 'openai:gpt-5-mini',
+  //   label: 'GPT-5 Mini',
+  //   provider: 'openai',
+  //   description: 'Compact chat model'
+  // },
 
-  // Google – Gemini 3 only
+  // Google – Gemini 2
   {
-    value: 'gemini:gemini-3-flash-preview',
-    label: 'Gemini 3 Flash Preview',
+    value: 'gemini:gemini-2.5-flash',
+    label: 'Gemini 2.5 Flash',
     provider: 'gemini',
-    description: 'Next-gen preview'
+    description: 'Fast and versatile'
   },
   {
-    value: 'gemini:gemini-3.1-pro-preview',
-    label: 'Gemini 3.1 Pro Preview',
+    value: 'gemini:gemini-2.5-pro',
+    label: 'Gemini 2.5 Pro',
     provider: 'gemini',
-    description: 'Advanced reasoning preview'
+    description: 'Most capable'
+  },
+  {
+    value: 'gemini:gemini-2.0-flash',
+    label: 'Gemini 2.0 Flash',
+    provider: 'gemini',
+    description: 'Multimodal, general tasks'
   },
 ];
 
-export const DEFAULT_MODEL = 'openai:gpt-5';
+export const DEFAULT_MODEL = 'gemini:gemini-2.5-flash';
 
 export const getModelLabel = (value: string): string => {
   const model = AVAILABLE_MODELS.find(m => m.value === value);
